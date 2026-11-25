@@ -1,6 +1,7 @@
 // Road trip: the legs (a ready Saudi loop, or your own), km and hours per leg, where to fill up, what falls due on the way,
 // papers that run out, the shifts you need leave for, the checklist before you go, a quick check each morning on the road,
 // and a log of what the trip costs while you travel.
+import * as EXU from './ui-extras.js';
 import { h, keyOf, fromKey, addDays } from './util.js';
 import * as L from './car.js';
 import * as CC from './carcare.js';
@@ -12,7 +13,7 @@ export function renderTrip() {
   const s = S(), now = new Date(), c = currentCar(s);
   if (!c) return [viewHead('Road trip'), h('div', { class: 'card empty' }, 'Add your car on the Dash first.')];
   const t = c.trip && !c.trip.closed ? c.trip : null;
-  if (!t) return [viewHead('Road trip'), carChips(s), startCard(c), pastTrips(c)];
+  if (!t) return [viewHead('Road trip'), carChips(s), startCard(c), pastTrips(c), EXU.toolsHint('trip')];
   const legsKm = L.legsTotal(t), km = t.km || legsKm.km, fu = km ? L.tripFuel(c, km, t.price) : null, due = L.dueByTrip(c, { ...t, km }, now), checks = new Set(t.checks || []);
   const end = t.end || (t.date ? keyOf(addDays(fromKey(t.date), 7)) : ''), today = keyOf(now), onRoad = t.date && today >= t.date && (!end || today <= end);
   const save = (patch) => { putCar({ ...c, trip: { ...t, ...patch } }); ctx.render(); };
@@ -25,6 +26,7 @@ export function renderTrip() {
       t.legs?.length ? h('div', { class: 'road', role: 'img', 'aria-label': `${doneLegs} of ${t.legs.length} legs driven` }, h('span', { class: 'car-dot', style: { left: `${Math.max(4, Math.min(96, pos * 100))}%` } }, '🚗')) : null,
       h('div', { class: 'stats', style: { marginTop: '10px' } }, stat(km ? km.toLocaleString('en') : '—', 'km'), legsKm.hrs ? stat(`${legsKm.hrs}`, 'hours driving') : null, fu ? stat(`${fu.litres}`, `litres (${fu.l100} L/100${fu.measured ? '' : ', typical'})`) : null, fu?.sar ? stat(fu.sar.toLocaleString('en'), `SAR fuel at ${fu.price}/L`) : null, spend.total ? stat(spend.total.toLocaleString('en'), 'SAR spent so far', 'acc') : null)),
     onRoad ? dailyCard(c, t, today) : null,
+    t.legs?.length && EXU.isOn('map') ? EXU.mapCard(t) : null,
     t.legs?.length ? legsCard(c, t, fu) : h('button', { class: 'card cta', onClick: () => tripSheet(c, t) }, h('span', { class: 'ic' }, '🗺️'), h('span', { class: 'grow' }, h('b', {}, 'Add the legs'), h('span', { class: 'tiny dim' }, ' · city to city, with km, hours and fuel stops')), h('span', { class: 'arrow' }, '+')),
     work.length ? h('div', { class: 'card warn' }, h('div', { class: 'title' }, `Leave needed · ${work.length} shift${work.length === 1 ? '' : 's'}`), h('div', { class: 'small' }, `From Mandarin, you are on the rota on ${work.slice(0, 8).map(w => `${dmy(w.key).slice(0, 5)}${w.type ? ` (${w.type})` : ''}`).join(', ')}${work.length > 8 ? '…' : ''}. Ask for leave or swaps before the rota closes.`)) : null,
     due.length ? h('div', { class: 'card' }, h('div', { class: 'title' }, `Do before you go · ${due.length}`), h('div', { class: 'tiny dim', style: { marginBottom: '6px' } }, 'Overdue, or due before the trip ends by date or by its km.'), h('div', { class: 'rows' }, due.map(st0 => careRow(c, st0))),
@@ -35,7 +37,7 @@ export function renderTrip() {
     logCard(c, t, spend),
     h('div', { class: 'card' }, h('div', { class: 'title' }, 'On the road'), h('ul', { class: 'small', style: { margin: 0, paddingLeft: '18px', display: 'grid', gap: '4px' } }, ['Fill up at half a tank between cities — stations thin out on some stretches.', 'Check tyre pressure cold each morning; a hot tyre reads higher.', 'If the temperature needle climbs: AC off, heater on full, pull over and let it cool before opening anything.', 'Sandstorm: slow down, lights on, never stop in the lane — pull fully off the road.', 'Rest every 2 hours; long straight highways make you sleepy.', 'Camels cross at night on desert roads: slow down after dark outside cities.'].map(x => h('li', {}, x)))),
     h('div', { class: 'row wrap', style: { margin: '4px 0 14px' } }, h('button', { class: 'btn', onClick: () => { const before = S(); putCar({ ...c, trip: null, trips: [...(c.trips || []), { ...t, closed: true }].slice(-12) }); ctx.render(); undoToast('Trip finished and kept in Past trips', before); } }, '🏁 Finish the trip'), h('button', { class: 'btn ghost', onClick: () => { const before = S(); putCar({ ...c, trip: null }); ctx.render(); undoToast('Trip cleared', before); } }, 'Clear')),
-    pastTrips(c)];
+    pastTrips(c), EXU.toolsHint('trip')];
 }
 function startCard(c) {
   return h('div', { class: 'card' }, h('div', { class: 'title' }, 'Plan a road trip'), h('div', { class: 'small muted', style: { marginBottom: '10px' } }, 'Pick a ready route or build your own. Autolime adds up the km and hours, the fuel and its cost, what falls due on the way and the checks.'),
@@ -45,7 +47,7 @@ function startCard(c) {
 }
 function pastTrips(c) {
   const list = [...(c.trips || [])].reverse(); if (!list.length) return null;
-  return h('details', { class: 'card adv' }, h('summary', {}, `Past trips · ${list.length}`), h('div', { class: 'rows' }, list.map(t => { const sp = L.tripSpend(t), km = t.km || L.legsTotal(t).km; return h('div', { class: 'item', style: { cursor: 'default' } }, h('span', { class: 'ii' }, '🏁'), h('span', { class: 'im' }, h('span', { class: 'in' }, t.name || 'Road trip'), h('span', { class: 'id' }, [t.date ? dmy(t.date) : '', km ? kmT(km) : '', sp.total ? sar(sp.total) : ''].filter(Boolean).join(' · ')))); })));
+  return h('details', { class: 'card adv' }, h('summary', {}, `Past trips · ${list.length}`), h('div', { class: 'rows' }, list.map(t => { const sp = L.tripSpend(t), km = t.km || L.legsTotal(t).km; return h('div', { class: 'item', style: { cursor: 'default' } }, h('span', { class: 'ii' }, '🏁'), h('span', { class: 'im' }, h('span', { class: 'in' }, t.name || 'Road trip'), h('span', { class: 'id' }, [t.date ? dmy(t.date) : '', km ? kmT(km) : '', sp.total ? sar(sp.total) : '', sp.total && km ? `${(sp.total / km).toFixed(2)} SAR/km all in` : ''].filter(Boolean).join(' · ')))); })));
 }
 function legsCard(c, t, fu) {
   const l100 = fu?.l100 || 7.5, tank = ctx.tank?.() || 70;

@@ -3,6 +3,7 @@
 // Autolime only reminds: renewals are done in Absher, at the inspection centre and with the insurer.
 import { keyOf, fromKey, addDays, startOfDay, uid } from './util.js';
 import * as CC from './carcare.js';
+import { cleanX } from './extras.js';
 
 const isKey = (v) => /^\d{4}-\d\d-\d\d$/.test(v || '');
 const rec = (o) => Object.values(o || {});
@@ -32,7 +33,7 @@ function cleanIdentity(c) {
   const yr = Math.round(num(c.year, 0, 2100, 0));
   return { plate: txt(c.plate, 24), plateLatin: txt(c.plateLatin, 12).toUpperCase(), vin: /^[A-HJ-NPR-Z0-9]{17}$/.test(vin) ? vin : '', year: yr >= 1950 ? yr : 0,
     colour: txt(c.colour, 24), seats: Math.round(num(c.seats, 0, 60, 0)), weight: Math.round(num(c.weight, 0, 50000, 0)), regType: txt(c.regType, 20),
-    tyre: cleanTyre(c.tyre), plan: cleanPlan(c.plan), trip: cleanTrip(c.trip), renew: cleanRenew(c.renew), trips: (Array.isArray(c.trips) ? c.trips : []).filter(x => x && typeof x === 'object').map(cleanTrip).filter(Boolean).slice(-12) };
+    tyre: cleanTyre(c.tyre), plan: cleanPlan(c.plan), trip: cleanTrip(c.trip), renew: cleanRenew(c.renew), x: cleanX(c.x), trips: (Array.isArray(c.trips) ? c.trips : []).filter(x => x && typeof x === 'object').map(cleanTrip).filter(Boolean).slice(-12) };
 }
 /** The tyres on the car: brand + model, size (215/60R16 99V), DOT year, warranty, when fitted. */
 function cleanTyre(t) {

@@ -4,7 +4,7 @@
 // record (kind, date, note, Drive id) is synced in state.json; the picture itself lives in Drive.
 import { keyOf, uid } from './util.js';
 
-export const KINDS = [['receipt', 'Receipt', '🧾'], ['sticker', 'Service sticker', '🏷️'], ['istimara', 'Istimara', '📄'], ['policy', 'Insurance policy', '🛡️'], ['licence', 'Licence', '🪪'], ['accident', 'Accident', '🚨'], ['part', 'A part / damage', '🔩'], ['other', 'Other', '📷']];
+export const KINDS = [['receipt', 'Receipt', '🧾'], ['sticker', 'Service sticker', '🏷️'], ['istimara', 'Istimara', '📄'], ['policy', 'Insurance policy', '🛡️'], ['licence', 'Licence', '🪪'], ['accident', 'Accident', '🚨'], ['part', 'A part / damage', '🔩'], ['parking', 'Parking spot', '📍'], ['other', 'Other', '📷']];
 export const kindOf = (k) => KINDS.find(x => x[0] === k) || KINDS[KINDS.length - 1];
 export const WALLET = ['istimara', 'policy', 'licence'];
 

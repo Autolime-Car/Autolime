@@ -3,6 +3,7 @@
 // and on a 1440p screen the space is used (3-column dash, cards in columns, pairs side by side).
 import { chromium, serve, page, sleep } from './helpers.mjs';
 import { shifts, state } from './fixture.mjs';
+import { toolsState } from './fixture-tools.mjs';
 
 const { server, url } = await serve(), browser = await chromium.launch();
 const TABS = ['dash', 'service', 'fuel', 'papers', 'trip', 'garage'];
@@ -36,14 +37,14 @@ const measure = () => {
   };
 };
 
-for (const ui of ['clean', 'paper', 'arcade']) for (const [w, hgt] of WIDTHS) {
-  const { p, errors } = await page(browser, { width: w, height: hgt, time: '2026-11-25T19:30:00+03:00', seed: state, shifts });
+for (const [seed, tools] of [[state, ''], [toolsState, ' everything']]) for (const ui of tools ? ['clean'] : ['clean', 'paper', 'arcade']) for (const [w, hgt] of WIDTHS) {
+  const { p, errors } = await page(browser, { width: w, height: hgt, time: '2026-11-25T19:30:00+03:00', seed, shifts });
   await p.addInitScript((u) => localStorage.setItem('autolime.ui', JSON.stringify({ ui: u, size: 'normal' })), ui);
   await p.goto(url); await sleep(700);
   for (const t of TABS) {
     await p.click(`nav.tabs button[data-view=${t}]`);
     await sleep(350);
-    const m = await p.evaluate(measure), at = `${ui} ${w}px ${t}`;
+    const m = await p.evaluate(measure), at = `${ui}${tools} ${w}px ${t}`;
     check(m.scrollW <= m.W + 1, `${at}: scrolls sideways (${m.scrollW} > ${m.W})`);
     check(!m.wide.length, `${at}: wider than the screen: ${m.wide.join(', ')}`);
     check(!m.clipped.length, `${at}: cut off at the cluster edge: ${m.clipped.join(', ')}`);

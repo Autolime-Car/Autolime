@@ -15,6 +15,8 @@ import * as GA from './garage.js';
 import * as OBD from './obd.js';
 import * as NZ from './noises.js';
 import * as AN from './anatomy.js';
+import * as EX from './extras.js';
+import { toolboxCard, toolsSheet as toolsSheetFor } from './ui-extras.js';
 import { join as joinParts, isPart } from './cloudparts.js';
 import { initKit, currentCar } from './ui-kit.js';
 import * as SH from './ui-sheets.js';
@@ -27,7 +29,7 @@ import { renderGarage, garagePart, quoteSheet, partSheet } from './ui-garage.js'
 import { checkBackup, describeCounts } from './backup-check.js';
 import { h, toast, keyOf, addDays, startOfDay, fromKey, fmtDate, DAY_NAMES, MONTHS, uid } from './util.js';
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 const CITRUS_URL = 'https://amaerys.github.io/citrus-maxima/';
 const CALAMANSI_URL = 'https://calamansi-food.github.io/Calamansi/';
 
@@ -62,11 +64,12 @@ async function boot() {
     else if (e.key === 'c') { go('garage', 'codes'); e.preventDefault(); }
     else if (e.key === '!') { SH.accidentSheet(c); e.preventDefault(); }
     else if (e.key === '?') { shortcutsSheet(); e.preventDefault(); }
+    else if (e.key === 't') { toolsSheetFor(EX.toolsFor(rt.view).length ? rt.view : 'apps'); e.preventDefault(); }
   });
   window.addEventListener('online', () => { rt.online = true; renderSync(); setTimeout(() => { if (G.isSignedIn()) refreshAll(false); }, 1500); });   // back online: save what waited
   window.addEventListener('offline', () => { rt.online = false; renderSync(); });
   initKit({ S, update: (fn) => store.update(fn), sheet, render: () => render(), go, undoTo, cheer, checkSetup: () => checkSetup(true), migrateNow,
-    itemSheet: SH.itemSheet, partSheet, quoteSheet, takePhoto, photoUrl, binPhoto, calendarForPlan, signedIn: () => G.isSignedIn(),
+    itemSheet: SH.itemSheet, partSheet, quoteSheet, takePhoto, photoUrl, binPhoto, calendarForPlan, calendarForPapers, signedIn: () => G.isSignedIn(),
     daysOff: (a, b) => HUB.daysOff(a, b), workDays: (a, b) => HUB.workDays(a, b), tank: () => CZ.custom(S()).car.tank });
   store.subscribe(() => { applyLook(); render(); publishSoon(); });
   store.onRemoteSync(scheduleRemoteSave);
@@ -395,6 +398,17 @@ async function calendarForPlan(carId, plan, prev = null) {
   toast('In your calendar', 'ok');
 }
 
+// ---------------- calendar: the papers (toolbox: papercal) ----------------
+/** Make the calendar hold one all-day event per paper on its expiry day (reminders 4 weeks and 1 week before); renewed papers move. */
+async function calendarForPapers(carId) {
+  const s = S(), c = s.cars?.[carId]; if (!c) return { created: 0, deleted: 0 };
+  const calId = s.settings.planCalendarId || 'primary';
+  const want = EX.paperEvents(c, L.driverOf(s).licence, L.CAR_PAPERS).map(e => { const start = fromKey(e.date); return { title: e.title, start, end: addDays(start, 1), allDay: true, key: e.key, reminders: [40320, 10080], description: `Autolime reminder. The istimara and the licence renew in Absher, the fahas at an inspection centre, the insurance with your insurer.\n${HUB.SITE_URL}?do=papers` }; });
+  // the window covers every paper's day (a licence can run ten years), so nothing outside it is added twice
+  const days = want.map(e => e.start.getTime()), from = addDays(new Date(Math.min(Date.now(), ...days)), -3), to = addDays(new Date(Math.max(Date.now(), ...days)), 3);
+  return G.syncTaggedEvents(calId, `papers-${carId}`, from, to, want);
+}
+
 // ---------------- photos ----------------
 /** Take or pick a photo, shrink it, keep it on this device, and (by default) save its record; it uploads on the next sync. */
 function takePhoto({ kind, car = '', note = '', item = '', save = true } = {}) {
@@ -445,7 +459,7 @@ function closeTopSheet() {
   bg.remove(); return true;
 }
 function shortcutsSheet() {
-  const rows = [['1 – 6', 'Dash, Service, Fuel, Papers, Trip, Garage'], [',', 'Settings'], ['/', 'Search'], ['s', 'Log a service'], ['f', 'Fill-up'], ['w', 'The workshop list'], ['c', 'Engine-light codes'], ['!', 'Accident card'], ['r', 'Sync now'], ['Esc', 'Close the top sheet'], ['?', 'This list']];
+  const rows = [['1 – 6', 'Dash, Service, Fuel, Papers, Trip, Garage'], [',', 'Settings'], ['/', 'Search'], ['t', 'Tools for this tab'], ['s', 'Log a service'], ['f', 'Fill-up'], ['w', 'The workshop list'], ['c', 'Engine-light codes'], ['!', 'Accident card'], ['r', 'Sync now'], ['Esc', 'Close the top sheet'], ['?', 'This list']];
   sheet([h('h2', {}, 'Keyboard shortcuts'), h('div', { class: 'kv keys' }, rows.flatMap(([k, v]) => [h('kbd', {}, k), h('span', {}, v)]))]);
 }
 let sheetGuard = false, sheetSelfBack = false, lastSheetClose = 0;
@@ -479,7 +493,11 @@ function openSearch() {
   for (const code of Object.values(OBD.CODES)) all.push({ name: `🟠 ${code.code}`, sub: `code · ${code.title}`, open: () => { go('garage', 'codes'); } , code: code.code });
   for (const x of NZ.SYMPTOMS) all.push({ name: `${x.icon} ${x.title}`, sub: `noise or feeling · ${x.ar}`, open: () => go('garage', 'noises') });
   for (const w of GA.shopList(s)) all.push({ name: `🔧 ${w.name}`, sub: `workshop · ${w.area}`, open: () => go('garage', 'shops') });
-  for (const p of AN.PARTS) all.push({ name: `${p.icon} ${p.name}`, sub: `anatomy · ${p.ar}`, open: () => partSheet(p) });
+  const tOn = CZ.allOn(s);
+  // codes, noises and anatomy follow the toolbox; every tool can be found (and switched on) by name
+  for (let i = all.length - 1; i >= 0; i--) if ((/^code/.test(all[i].sub) && !tOn.codes) || (/^noise/.test(all[i].sub) && !tOn.noises)) all.splice(i, 1);
+  if (tOn.anatomy) for (const p of AN.PARTS) all.push({ name: `${p.icon} ${p.name}`, sub: `anatomy · ${p.ar}`, open: () => partSheet(p) });
+  for (const t of EX.TOOLS) all.push({ name: `${t[2]} ${t[1]}`, sub: `tool · ${EX.TAB_NAME[t[3]]} · ${tOn[t[0]] ? 'on' : 'off — tap to see it'} · ${t[5]}`, open: () => { if (t[3] !== 'apps') go(t[3]); toolsSheetFor(t[3]); } });
   let sel = 0, hits = [];
   const list = h('div', { class: 'res' });
   const paint = (q) => {
@@ -604,7 +622,7 @@ function diagnosticsCard() {
 }
 function renderMore() {
   const s = S(), signed = G.isSignedIn();
-  const out = [h('h1', {}, 'Settings'), cloudCard(), uiPicker(), customiseCard()];
+  const out = [h('h1', {}, 'Settings'), cloudCard(), toolboxCard(), uiPicker(), customiseCard()];
   const cid = h('input', { type: 'text', value: s.settings.clientId, spellcheck: false, 'aria-label': 'OAuth client ID' });
   out.push(h('div', { class: 'card' }, h('div', { class: 'title' }, 'Google'),
     h('div', { class: 'small muted' }, 'Drive keeps Autolime in step on all your devices (Citrus › Life › Car - Autolime), holds your photos, tells Citrus how the car is doing and reads your days off from Mandarin. Calendar holds the service day.'),

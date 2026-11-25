@@ -3,6 +3,7 @@
 // service with prices, a fill-up, a quote compare, the code lookup and a noise all work. Run: node test/smoke.mjs
 import { chromium, serve, page, sleep, checker } from './helpers.mjs';
 import { shifts, state } from './fixture.mjs';
+import { toolsState } from './fixture-tools.mjs';
 import fs from 'node:fs'; import path from 'node:path';
 const shots = path.resolve(path.dirname(new URL(import.meta.url).pathname), 'shots/smoke'); fs.rmSync(shots, { recursive: true, force: true }); fs.mkdirSync(shots, { recursive: true });
 const { server, url } = await serve(), browser = await chromium.launch(), { check, bad } = checker();
@@ -92,6 +93,71 @@ st = await p.evaluate(() => JSON.parse(localStorage.getItem('autolime.state.v1')
 check(!st.cars.car1.trip && st.cars.car1.trips.length === 1, 'a finished trip goes to Past trips');
 check(!errors.length, `no page errors (${errors.join(' | ')})`);
 await p.context().close();
+
+console.log('the toolbox (simple by default, more when switched on)');
+{
+  const tb = await page(browser, { time: '2026-11-25T19:30:00+03:00', seed: state, shifts }), q = tb.p;
+  const S2 = () => q.evaluate(() => JSON.parse(localStorage.getItem('autolime.state.v1')));
+  await q.goto(url); await sleep(500);
+  check(!(await q.locator('#view-dash :text("I parked here")').count()) && !(await q.locator('#view-dash :text("Worth a look")').count()), 'new tools are off: no parking or warnings card');
+  check(await q.locator('#view-dash .tools-hint').count() === 1, 'the Dash ends with a quiet "Tools for Dash" link');
+  await q.click('#view-dash .tools-hint'); await sleep(300);
+  check(await q.locator('.sheet [role=switch]').count() === 4, 'it opens the Dash tools as switches');
+  await q.click('.sheet [role=switch]:has-text("Where I parked")'); await sleep(300);
+  check((await q.locator('.sheet [role=switch][aria-checked=true]:has-text("Where I parked")').count()) === 1, 'the switch flips and says so (aria-checked)');
+  await q.keyboard.press('Escape'); await sleep(400);
+  check(await q.locator('#view-dash :text("I parked here")').count() === 1, 'the parking card appears on the Dash');
+  // Settings: presets
+  await q.click('#btnMore'); await sleep(300);
+  await q.click('#toolbox [role=radio]:has-text("Simple")'); await sleep(300);
+  let st2 = await S2(); check(Object.entries(st2.settings.custom.tools).every(([id, v]) => v === (id === 'share')), 'Simple: every tool off but sharing');
+  await q.click('nav.tabs button[data-view=garage]'); await sleep(300);
+  check(!(await q.locator('#view-garage .garage-tiles').count()), 'Simple Garage: just workshops and quotes, no tiles');
+  await q.click('nav.tabs button[data-view=dash]'); await sleep(300);
+  check(!(await q.locator('#view-dash :text("Logbook")').count()) && await q.locator('#view-dash :text("Due now")').count() === 1, 'Simple Dash: no logbook, what is due stays');
+  await q.click('#btnMore'); await sleep(300);
+  await q.click('#toolbox [role=radio]:has-text("Everything")'); await sleep(300);
+  st2 = await S2(); check(Object.values(st2.settings.custom.tools).every(Boolean), 'Everything: every tool on');
+  // a tyre reading, a battery check, a fine, a quote, a spare
+  await q.click('nav.tabs button[data-view=service]'); await sleep(300);
+  await q.click('#view-service button:has-text("+ Reading")'); await sleep(200);
+  await q.fill('.sheet input[aria-label="front left tread mm"]', '5.2'); await q.fill('.sheet input[aria-label="front left pressure psi"]', '29');
+  await q.click('.sheet button:has-text("Save")'); await sleep(300);
+  await q.click('#view-service button:has-text("+ Check")'); await sleep(200); await q.fill('.sheet input[aria-label="Volts"]', '12.3'); await q.click('.sheet button:has-text("Save")'); await sleep(300);
+  st2 = await S2(); check(st2.cars.car1.x?.tyreLog?.[0]?.tread?.FL === 5.2 && st2.cars.car1.x?.battery?.[0]?.v === 12.3, 'a tyre reading and a battery check are saved');
+  check(/Add air/.test(await q.locator('#view-service').innerText()), 'low pressure says "Add air"');
+  // the service sheet gains warranty fields and the receipt reader
+  await q.click('#view-service button:has-text("Log a service")'); await sleep(300);
+  await q.evaluate(() => { for (const d of document.querySelectorAll('.sheet details')) d.open = true; }); await sleep(100);
+  check(await q.locator('.sheet input[aria-label$="warranty (months)"]').count() > 0 && await q.locator('.sheet button:has-text("Read the receipt")').count() === 1, 'the service sheet gets warranty months and "Read the receipt"');
+  await q.keyboard.press('Escape'); await sleep(400);
+  await q.click('nav.tabs button[data-view=papers]'); await sleep(300);
+  await q.click('#view-papers button:has-text("+ A fine")'); await sleep(200); await q.fill('.sheet input[aria-label="Fine (SAR)"]', '300'); await q.click('.sheet button:has-text("Save")'); await sleep(300);
+  await q.click('#view-papers button:has-text("+ Quote")'); await sleep(200); await q.fill('.sheet input[placeholder="insurer"]', 'Test Insurer'); await q.fill('.sheet input[aria-label="Premium (SAR a year)"]', '990'); await q.click('.sheet button:has-text("Save")'); await sleep(300);
+  st2 = await S2(); check(st2.cars.car1.x?.fines?.[0]?.sar === 300 && st2.cars.car1.x?.finesChecked === '2026-11-25' && st2.cars.car1.x?.insQuotes?.[0]?.premium === 990, 'a fine (marks the check done) and an insurance quote');
+  await q.click('nav.tabs button[data-view=garage]'); await sleep(300);
+  await q.click('#view-garage button:has-text("+ Spare")'); await sleep(200); await q.fill('.sheet input[placeholder="e.g. 5W-30 oil"]', 'Test oil'); await q.fill('.sheet input[aria-label="Quantity"]', '1'); await q.selectOption('.sheet select[aria-label="Used for"]', 'oil'); await q.click('.sheet button:has-text("Save")'); await sleep(300);
+  await q.click('#view-garage button[aria-label="One less Test oil"]'); await sleep(300);
+  st2 = await S2(); check(st2.cars.car1.x?.stock?.[0]?.qty === 0, 'a spare is added and counted down');
+  check(/1 low/i.test(await q.locator('#view-garage').innerText()), 'and shows as low');
+  // a fill-up with a station
+  await q.click('nav.tabs button[data-view=fuel]'); await sleep(300);
+  await q.click('#view-fuel button:has-text("Fill-up")'); await sleep(200);
+  await q.fill('.sheet input[aria-label="Litres"]', '40'); await q.fill('.sheet input[aria-label="Paid (SAR)"]', '93.2'); await q.fill('.sheet input[aria-label="Station"]', 'Test Station'); await q.click('.sheet button:has-text("Save")'); await sleep(300);
+  st2 = await S2(); check(st2.cars.car1.fuel.at(-1).station === 'Test Station', 'a fill-up keeps its station');
+  check(/Test Station/.test(await q.locator('#view-fuel').innerText()), 'and Fuel shows where you fill up');
+  check(!tb.errors.length, `toolbox: no page errors (${tb.errors.join(' | ')})`);
+  await q.context().close();
+  // every tool on, every tab, three sizes: no blanks, no NaN, no sideways scroll
+  for (const [w, hgt, ui] of [[390, 844, 'clean'], [320, 640, 'arcade'], [1500, 900, 'paper']]) {
+    const ev = await page(browser, { width: w, height: hgt, time: '2026-11-25T19:30:00+03:00', seed: toolsState, shifts });
+    await ev.p.addInitScript((u) => localStorage.setItem('autolime.ui', JSON.stringify({ ui: u, size: 'normal' })), ui);
+    await ev.p.goto(url); await sleep(500);
+    for (const t of TABS) { if (t === 'more') await ev.p.click('#btnMore'); else await ev.p.click(`nav.tabs button[data-view=${t}]`); await sleep(250); await clean(ev.p, `#view-${t}`, `everything on, ${w}px ${ui}: ${t}`); await noScroll(ev.p, `everything on, ${w}px: ${t}`); }
+    check(!ev.errors.length, `everything on, ${w}px: no page errors (${ev.errors.join(' | ')})`);
+    await ev.p.context().close();
+  }
+}
 
 console.log('deep links and the setup link');
 const dl = await page(browser, { time: '2026-11-25T19:30:00+03:00', seed: state, shifts });

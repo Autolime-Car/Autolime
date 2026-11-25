@@ -8,6 +8,9 @@ import * as PO from './policy.js';
 import * as AN from './anatomy.js';
 import * as GA from './garage.js';
 import * as PH from './photos.js';
+import * as EX from './extras.js';
+import * as CZ from './custom.js';
+import { receiptButton } from './ui-extras.js';
 import { ctx, S, field, dmy, kmT, sar, putCar, undoToast, tel, plateParts, colourName, careRow, tag } from './ui-kit.js';
 
 const sheet = (content, cls = '') => { const b = ctx.sheet(content); if (cls) b.box.classList.add(...cls.split(' ')); return b; };
@@ -24,7 +27,7 @@ export function itemSheet(c, id) {
   const togglePlan = () => { const items = inPlan ? c.plan.items.filter(x => x !== id) : [...(c.plan?.items || []), id]; putCar({ ...c, plan: items.length ? { ...(c.plan || {}), date: c.plan?.date || '', note: c.plan?.note || '', added: (c.plan?.added || []).filter(x => items.includes(x)), items: CC.ITEM_ORDER.filter(x => items.includes(x)) } : null }); box.close(); ctx.render(); toast(inPlan ? 'Taken off the plan' : 'Added to the planned service', 'ok'); };
   const prices = GA.priceHistory(s, c.id, id).slice(0, 6), where = AN.partsFor(id), photos = PH.photoList(s, { car: c.id }).filter(p => p.item === id).slice(0, 6);
   const whereBox = where.length ? whereMap(where) : null;
-  const box = sheet([h('h2', {}, `${def.icon} ${def.label}`), def.ar ? h('div', { class: 'ar', lang: 'ar', dir: 'rtl', style: { fontSize: '1.35rem', fontWeight: 700, marginBottom: '6px' } }, def.ar) : null, h('div', { class: 'small' }, def.what),
+  const box = sheet([h('h2', {}, `${def.icon} ${def.label}`), def.ar ? h('div', { class: 'ar', lang: 'ar', dir: 'rtl', style: { fontSize: '1.35rem', fontWeight: 700, marginBottom: '6px' } }, def.ar) : null, (() => { const w = CZ.on(s, 'warranty') ? EX.coveredNow(c, id, now) : null; return w ? h('div', { class: 'banner ok', style: { marginBottom: '6px' } }, `🛡️ Under warranty until ${dmy(w.until)}${w.part ? ` (${w.part})` : ''} — go back to the workshop first.`) : null; })(), h('div', { class: 'small' }, def.what),
     CC.PARTS[id] && CC.PARTS[id] !== '—' ? h('div', { class: 'note' }, h('b', {}, 'Ask for: '), CC.PARTS[id]) : null, h('div', { class: 'tiny dim', style: { margin: '4px 0 10px' } }, def.why),
     h('div', { class: `item st-${st.state}`, style: { cursor: 'default' } }, h('span', { class: 'ii' }, st.state === 'late' ? '⛔' : st.state === 'soon' ? '⚠️' : st.state === 'ok' ? '✅' : '❔'), h('span', { class: 'im' }, h('span', { class: 'in' }, st.state === 'unknown' ? 'Not set up yet' : CC.dueText(st, dmy)), st.last ? h('span', { class: 'id' }, `Last done ${dmy(st.last)}${st.lastKm ? ` at ${kmT(st.lastKm)}` : ''}${st.count ? ` · ${st.count}× logged` : ''}`) : null)),
     foot(h('button', { class: 'btn primary grow', onClick: done }, 'Done today ✓'), def.days ? null : h('button', { class: 'btn', onClick: togglePlan }, inPlan ? '🗓 Off the plan' : '🗓 Add to plan')),
@@ -56,25 +59,28 @@ export function visitSheet(c, pre = null) {
   const shops = GA.shopList(s), shopSel = h('select', { 'aria-label': 'Workshop' }, h('option', { value: '' }, '— workshop —'), shops.map(w => h('option', { value: w.id, selected: c.plan?.shop === w.id }, w.name)), h('option', { value: '+' }, '+ Another (type below)'));
   const place = h('input', { maxlength: 60, placeholder: 'workshop name', hidden: true }); shopSel.addEventListener('change', () => { place.hidden = shopSel.value !== '+'; if (!place.hidden) place.focus(); });
   const note = h('input', { maxlength: 140, placeholder: 'note (optional)' }), total = h('input', { type: 'number', min: 0, step: 'any', inputmode: 'decimal', placeholder: 'or the total' });
-  const line = {}; const lines = h('div', { class: 'rows' });
-  const paintLines = () => lines.replaceChildren(...[...pick].filter(id => CC.ITEMS[id]).map(id => { const L0 = line[id] ||= { price: h('input', { type: 'number', min: 0, step: 'any', inputmode: 'decimal', placeholder: 'SAR', 'aria-label': `${CC.ITEMS[id].label} price` }), part: h('input', { maxlength: 60, placeholder: CC.PARTS[id] && CC.PARTS[id] !== '—' ? CC.PARTS[id].split(/[,.—(]/)[0].slice(0, 30) : 'part / brand', 'aria-label': `${CC.ITEMS[id].label} part` }) }; const last = GA.lastPaid(s, c.id, id);
-    return h('div', { class: 'item', style: { cursor: 'default', flexWrap: 'wrap' } }, h('span', { class: 'ii' }, CC.ITEMS[id].icon), h('span', { class: 'im' }, h('span', { class: 'in' }, CC.ITEMS[id].label), last ? h('span', { class: 'id' }, `last time ${sar(last.price)}${last.where ? ` at ${last.where}` : ''}`) : null), h('div', { class: 'grid2', style: { width: '100%' } }, L0.part, L0.price)); }));
+  const line = {}; const lines = h('div', { class: 'rows' }), wOn = CZ.on(s, 'warranty'), rOn = CZ.on(s, 'receipt');
+  const paintLines = () => lines.replaceChildren(...[...pick].filter(id => CC.ITEMS[id]).map(id => { const L0 = line[id] ||= { price: h('input', { type: 'number', min: 0, step: 'any', inputmode: 'decimal', placeholder: 'SAR', 'aria-label': `${CC.ITEMS[id].label} price` }), part: h('input', { maxlength: 60, placeholder: CC.PARTS[id] && CC.PARTS[id] !== '—' ? CC.PARTS[id].split(/[,.—(]/)[0].slice(0, 30) : 'part / brand', 'aria-label': `${CC.ITEMS[id].label} part` }), wm: wOn ? h('input', { type: 'number', min: 0, max: 120, inputmode: 'numeric', placeholder: 'warranty, months', 'aria-label': `${CC.ITEMS[id].label} warranty (months)` }) : null }; const last = GA.lastPaid(s, c.id, id);
+    return h('div', { class: 'item', style: { cursor: 'default', flexWrap: 'wrap' } }, h('span', { class: 'ii' }, CC.ITEMS[id].icon), h('span', { class: 'im' }, h('span', { class: 'in' }, CC.ITEMS[id].label), last ? h('span', { class: 'id' }, `last time ${sar(last.price)}${last.where ? ` at ${last.where}` : ''}`) : null), h('div', { class: wOn ? 'grid3' : 'grid2', style: { width: '100%' } }, L0.part, L0.price, L0.wm)); }));
   // the parts by system, the ones due first in each, so a visit is ticked in a few taps
   const chips = h('div'); const chip = (x) => h('button', { class: `chip ${pick.has(x.id) ? 'sel' : ''}`, 'aria-pressed': String(pick.has(x.id)), onClick: () => { pick.has(x.id) ? pick.delete(x.id) : pick.add(x.id); paint(); } }, `${x.def.icon} ${x.def.label}${x.state === 'late' ? ' ⚠' : ''}`);
   const paint = () => { chips.replaceChildren(...CC.GROUPS.map(([name, icon, ids]) => { const its = ids.map(id => items.find(x => x.id === id)).filter(x => x && (!x.def.days || pick.has(x.id))); return its.length ? h('div', { style: { marginBottom: '6px' } }, h('div', { class: 'tiny dim', style: { margin: '2px 0 4px' } }, `${icon} ${name}`), h('div', { class: 'chips' }, its.map(chip))) : null; })); paintLines(); }; paint();
   let receipt = null; const rc = h('button', { class: 'btn', onClick: async () => { receipt = await ctx.takePhoto({ kind: 'receipt', car: c.id, note: 'Service receipt', save: false }); if (receipt) { rc.textContent = '🧾 Receipt added ✓'; } } }, '🧾 Photo of the receipt');
   const err = h('div', { class: 'err', role: 'alert' });
+  const advBox = h('details', { class: 'adv', open: pick.size > 0 && pick.size <= 6 }, h('summary', { class: 'small' }, 'Parts and prices (for comparing next time)'), lines);
+  const readBtn = rOn ? receiptButton((found, tot) => { for (const f of found) pick.add(f.item); paint(); for (const f of found) { const L0 = line[f.item]; if (L0) { if (f.price) L0.price.value = f.price; if (f.part && !L0.part.value) L0.part.value = f.part; } } if (tot && !total.value) total.value = tot; advBox.open = true; }) : null;
   const box = sheet([h('h2', {}, `🔧 Service for ${c.name}`), h('div', { class: 'small muted' }, 'Tick what was done. Each ticked item restarts from this date and reading.'), chips,
     h('div', { class: 'grid2', style: { marginTop: '10px' } }, field('Date', d), field('Odometer (km)', k)), field('Workshop', shopSel, place),
-    h('details', { class: 'adv', open: pick.size > 0 && pick.size <= 6 }, h('summary', { class: 'small' }, 'Parts and prices (for comparing next time)'), lines), h('div', { class: 'grid2' }, field('Total paid (SAR)', total), field('Note', note)), rc, err,
+    advBox, h('div', { class: 'grid2' }, field('Total paid (SAR)', total), field('Note', note)), h('div', { class: 'row wrap' }, rc, readBtn), err,
     foot(h('button', { class: 'btn primary grow', onClick: () => {
       if (!pick.size) { err.textContent = 'Tick at least one thing'; return; }
       const before = S(), last = (c.odoLog || []).filter(r => r.date <= d.value).pop();
       if (+k.value && last && +k.value < last.km) { err.textContent = `The odometer read ${kmT(last.km)} on ${dmy(last.date)} — check the km`; return; }
-      const ln = [...pick].map(id => ({ item: id, price: line[id]?.price.value || 0, part: line[id]?.part.value || '' }));
+      const ln = [...pick].map(id => ({ item: id, price: line[id]?.price.value || 0, part: line[id]?.part.value || '', wm: line[id]?.wm?.value || 0 }));
       const shopId = shopSel.value && shopSel.value !== '+' ? shopSel.value : '', shopName = shopId ? s.workshops[shopId]?.name : place.value;
       const visitId = `v${Date.now().toString(36)}`;
-      putCar(L.afterVisit(CC.logVisit(c, { date: d.value, km: k.value, items: [...pick], cost: total.value, place: shopName || '', shop: shopId, note: note.value, lines: ln, photos: receipt ? [receipt.id] : [] }), [...pick]));
+      const useSt = CZ.on(s, 'stock') ? (x) => EX.useStock(x, [...pick]) : (x) => x;
+      putCar(useSt(L.afterVisit(CC.logVisit(c, { date: d.value, km: k.value, items: [...pick], cost: total.value, place: shopName || '', shop: shopId, note: note.value, lines: ln, photos: receipt ? [receipt.id] : [] }), [...pick])));
       if (receipt) ctx.update(st => PH.savePhoto(st, { ...receipt, visit: visitId, date: d.value }));
       box.close(); ctx.render(); ctx.cheer?.(); undoToast(`${pick.size} item${pick.size === 1 ? '' : 's'} logged`, before); } }, 'Save the service'), cancel(() => box))], 'wide');
 }
@@ -86,10 +92,12 @@ export function fuelSheet(c) {
   const per = h('div', { class: 'tiny dim' });
   const upd = () => { const a = +l.value, b = +sr.value; per.textContent = a && b ? `${(b / a).toFixed(2)} SAR a litre` : lastPrice ? `Last time ${(lastPrice.cost / lastPrice.litres).toFixed(2)} SAR a litre` : ''; };
   l.addEventListener('input', () => { if (!sr.value && lastPrice && +l.value) sr.placeholder = `≈ ${Math.round(+l.value * lastPrice.cost / lastPrice.litres)}`; upd(); }); sr.addEventListener('input', upd); upd();
+  const stOn = CZ.on(S(), 'stations'), known = stOn ? EX.stations(c).map(x => x.name) : [], dl = 'st-' + Date.now().toString(36);
+  const stn = stOn ? h('input', { maxlength: 40, list: dl, placeholder: 'station (optional)', value: (c.fuel || []).filter(f => f.station).slice(-1)[0]?.station || '', 'aria-label': 'Station' }) : null;
   const full = h('input', { type: 'checkbox', checked: true }), trip = c.trip && !c.trip.closed && c.trip.date && c.trip.date <= keyOf(now) && (!c.trip.end || c.trip.end >= keyOf(now)) ? h('input', { type: 'checkbox', checked: true }) : null, err = h('div', { class: 'err', role: 'alert' });
-  const box = sheet([h('h2', {}, '⛽ Fill-up'), h('div', { class: 'grid2' }, field('Litres', l), field('Paid (SAR)', sr)), per, h('div', { class: 'grid2', style: { marginTop: '8px' } }, field('Odometer (km)', k), field('Date', d)), h('label', { class: 'row small' }, full, ' Filled to full (needed for L/100 km)'), trip ? h('label', { class: 'row small' }, trip, ` Count it in the trip “${c.trip.name || 'road trip'}”`) : null, err,
+  const box = sheet([h('h2', {}, '⛽ Fill-up'), h('div', { class: 'grid2' }, field('Litres', l), field('Paid (SAR)', sr)), per, h('div', { class: 'grid2', style: { marginTop: '8px' } }, field('Odometer (km)', k), field('Date', d)), stn ? field('Station', stn, h('datalist', { id: dl }, known.map(n => h('option', { value: n })))) : null, h('label', { class: 'row small' }, full, ' Filled to full (needed for L/100 km)'), trip ? h('label', { class: 'row small' }, trip, ` Count it in the trip “${c.trip.name || 'road trip'}”`) : null, err,
     h('div', { class: 'tiny dim' }, 'Fill to full twice with the odometer and Autolime works out your consumption and cost per km.'),
-    foot(h('button', { class: 'btn primary grow', onClick: () => { if (!(+l.value > 0)) { err.textContent = 'How many litres?'; return; } const before = S(); let car = CC.addFuel(c, { date: d.value, litres: l.value, cost: sr.value || (lastPrice ? Math.round(+l.value * lastPrice.cost / lastPrice.litres * 100) / 100 : 0), km: k.value, full: full.checked });
+    foot(h('button', { class: 'btn primary grow', onClick: () => { if (!(+l.value > 0)) { err.textContent = 'How many litres?'; return; } const before = S(); let car = CC.addFuel(c, { date: d.value, litres: l.value, cost: sr.value || (lastPrice ? Math.round(+l.value * lastPrice.cost / lastPrice.litres * 100) / 100 : 0), km: k.value, full: full.checked, station: stn?.value || '' });
       if (trip?.checked) car = { ...car, trip: { ...car.trip, log: [...(car.trip.log || []), { date: d.value, kind: 'fuel', sar: +sr.value || 0, litres: +l.value, note: '', at: Date.now() }] } };
       putCar(car); box.close(); ctx.render(); undoToast('Fill-up saved', before); } }, 'Save'), cancel(() => box))]);
 }

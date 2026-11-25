@@ -1,6 +1,7 @@
 // Papers: istimara, fahas, insurance and your licence with days left, the renewal checklists (Absher, the inspection booking,
 // insurance quotes before the loyalty discount runs out), the insurance card read from its PDF, the papers wallet (photos on
 // your own Drive), the car's identity and the accident card.
+import * as EXU from './ui-extras.js';
 import { h, fromKey } from './util.js';
 import * as L from './car.js';
 import * as CC from './carcare.js';
@@ -15,8 +16,8 @@ export function renderPapers() {
   if (!c) return [viewHead('Papers'), driverCard(now), h('div', { class: 'card empty' }, 'Add your car on the Dash to keep its papers here.')];
   const renew = PA.openRenewals(s, c, now);
   return [viewHead('Papers', h('button', { class: 'btn sos', onClick: () => accidentSheet(c) }, '🚨 Accident card')), carChips(s),
-    papersCard(c, now), ...renew.map((r, i) => renewCard(c, r, i === 0)), insCard(c, now), driverCard(now), walletCard(c, s), idCard(c, CC.MODELS[c.model]),
-    h('div', { class: 'tiny dim', style: { margin: '4px 2px 14px' } }, 'Autolime only reminds. The istimara and the licence renew in Absher, the fahas at an inspection centre (book first), the insurance with your insurer.')];
+    papersCard(c, now), ...renew.map((r, i) => renewCard(c, r, i === 0)), insCard(c, now), driverCard(now), walletCard(c, s), ...EXU.tabTools('papers', c), idCard(c, CC.MODELS[c.model]),
+    h('div', { class: 'tiny dim', style: { margin: '4px 2px 14px' } }, 'Autolime only reminds. The istimara and the licence renew in Absher, the fahas at an inspection centre (book first), the insurance with your insurer.'), EXU.toolsHint('papers')];
 }
 function papersCard(c, now) {
   const dr = L.driverOf(S()), next = PA.fahasBookBy(c);

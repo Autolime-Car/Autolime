@@ -252,8 +252,9 @@ function normalizeEvent(e, calendarId) {
   const end = allDay ? new Date(e.end.date + 'T00:00:00') : new Date(e.end.dateTime);
   return { id: e.id, calendarId, title: e.summary || '(no title)', start, end, allDay, location: e.location || '', tag: e.extendedProperties?.private?.autolime || '', citrus: e.extendedProperties?.private?.citrus || '', htmlLink: e.htmlLink, color: e.colorId };
 }
-export async function createEvent(calendarId, { title, start, end, description = '', location = '', tag = '', colorId, key = '', reminders = null, recurrence = null, timeZone = '' }) {
-  const body = { summary: title, description, location, start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() }, extendedProperties: { private: { autolime: tag || 'event', ...(key ? { key } : {}) } } };
+export async function createEvent(calendarId, { title, start, end, description = '', location = '', tag = '', colorId, key = '', reminders = null, recurrence = null, timeZone = '', allDay = false }) {
+  const day = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const body = { summary: title, description, location, start: allDay ? { date: day(start) } : { dateTime: start.toISOString() }, end: allDay ? { date: day(end) } : { dateTime: end.toISOString() }, extendedProperties: { private: { autolime: tag || 'event', ...(key ? { key } : {}) } } };
   if (colorId) body.colorId = colorId;
   // alarms: minutes before the start, as pop-ups (your phone's Calendar app rings them even when Autolime is closed)
   if (Array.isArray(reminders)) body.reminders = { useDefault: false, overrides: reminders.slice(0, 5).map(m => ({ method: 'popup', minutes: Math.max(0, Math.min(40320, +m || 0)) })) };

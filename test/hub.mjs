@@ -69,6 +69,18 @@ await sleep(500); await A.p.click('#view-service button:has-text("Edit the plan"
 await A.p.click('.sheet button:has-text("Clear")'); await A.p.click('.sheet button:has-text("Save the plan")');
 check(await until(A.p, () => true) && await (async () => { await sleep(800); return g.calendars.get('primary').events.size === 0; })(), 'clearing the plan takes it out of the calendar');
 
+console.log('papers in the calendar (toolbox)');
+await A.p.click('nav.tabs button[data-view=papers]'); await sleep(300);
+await A.p.click('#view-papers .tools-hint'); await sleep(300);
+await A.p.click('.sheet [role=switch]:has-text("Papers in my calendar")'); await sleep(200);
+await A.p.keyboard.press('Escape'); await sleep(450);
+await A.p.click('#view-papers button:has-text("Put them in my calendar")');
+const allDay = () => [...g.calendars.get('primary').events.values()].filter(e => e.start?.date);
+check(await until(A.p, () => true) && await (async () => { for (let i = 0; i < 20 && allDay().length < 4; i++) await sleep(250); return allDay().length === 4; })(), `four all-day paper events (${allDay().map(e => e.summary).join(' | ')})`);
+check(allDay().every(e => e.reminders?.overrides?.length === 2) && allDay().some(e => /licence/i.test(e.summary) && e.start.date > '2030-01-01'), 'with reminders, the licence on its expiry day');
+await sleep(400); await A.p.click('#view-papers button:has-text("Put them in my calendar")'); await sleep(1500);
+check(allDay().length === 4, `tapping again makes no duplicates (${allDay().length})`)
+
 console.log('a photo goes to Drive');
 await A.p.click('nav.tabs button[data-view=papers]'); await sleep(200);
 const [chooser] = await Promise.all([A.p.waitForEvent('filechooser'), A.p.click('.thumb.add:has-text("Istimara")')]);

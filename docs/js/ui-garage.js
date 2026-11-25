@@ -1,5 +1,7 @@
 // Garage: the workshops you use (and what they did), quotes side by side, engine-light codes in plain words, the dashboard
 // lights, "what does this noise mean" guided checks, and the car's anatomy with the Arabic names and a Find-it game.
+import * as EXU from './ui-extras.js';
+import * as CZ from './custom.js';
 import { h, toast, keyOf } from './util.js';
 import * as L from './car.js';
 import * as CC from './carcare.js';
@@ -14,10 +16,11 @@ let part = 'shops', codeQ = '', symId = '', picks = [], anView = 'bay', game = n
 const PARTS = [['shops', '🔧', 'Workshops', 'and quotes side by side'], ['codes', '🟠', 'Codes', 'engine light in plain words'], ['noises', '👂', 'Noises', 'what is that sound?'], ['anatomy', '🔍', 'Anatomy', 'every part, in Arabic too']];
 export function garagePart(p) { if (PARTS.some(x => x[0] === p)) part = p; }
 export function renderGarage() {
-  const s = S(), c = currentCar(s);
+  const s = S(), c = currentCar(s), tiles = PARTS.filter(([id]) => id === 'shops' || CZ.on(s, id));
+  if (!tiles.some(t => t[0] === part)) part = 'shops';
   return [viewHead('Garage'), carChips(s),
-    h('div', { class: 'garage-tiles', role: 'tablist' }, PARTS.map(([id, ic, t, sub]) => h('button', { class: `gt ${part === id ? 'active' : ''}`, role: 'tab', 'aria-selected': String(part === id), onClick: () => { part = id; ctx.render(); } }, h('span', {}, ic), h('b', {}, t), h('small', {}, sub)))),
-    ...(part === 'codes' ? codesView(c) : part === 'noises' ? noisesView(c) : part === 'anatomy' ? anatomyView(c) : [h('div', { class: 'wide pair' }, shopsView(s, c))])];
+    tiles.length > 1 ? h('div', { class: 'garage-tiles', role: 'tablist', style: { '--n': tiles.length } }, tiles.map(([id, ic, t, sub]) => h('button', { class: `gt ${part === id ? 'active' : ''}`, role: 'tab', 'aria-selected': String(part === id), onClick: () => { part = id; ctx.render(); } }, h('span', {}, ic), h('b', {}, t), h('small', {}, sub)))) : null,
+    ...(part === 'codes' ? codesView(c) : part === 'noises' ? noisesView(c) : part === 'anatomy' ? anatomyView(c) : [h('div', { class: 'wide pair' }, shopsView(s, c)), ...EXU.tabTools('garage', c)]), EXU.toolsHint('garage')];
 }
 
 // ───────────────────────── workshops + quotes

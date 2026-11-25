@@ -1,6 +1,8 @@
 // Dash: the instrument cluster — health as a tachometer, the odometer roller, fuel use on a small gauge, the warning lights
 // that would be on, the plate, and the four things you do most (log a service, fuel, the workshop list, the accident card).
 // Under it: what is due, the papers at a glance, the planned service, the trip and this month's money.
+import * as EXU from './ui-extras.js';
+import * as CZ from './custom.js';
 import { h, toast, keyOf } from './util.js';
 import * as L from './car.js';
 import * as CC from './carcare.js';
@@ -20,13 +22,15 @@ export function renderDash() {
       h('div', {},
         urgent.length ? h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('div', { class: 'title' }, `Due now · ${urgent.length}`), h('button', { class: 'btn sm', onClick: () => planSheet(c) }, c.plan ? '🗓 Plan' : '🗓 Plan them')), h('div', { class: 'rows' }, urgent.filter(x => !planned.has(x.id)).slice(0, 7).map(st => careRow(c, st))), urgent.some(x => planned.has(x.id)) ? h('div', { class: 'tiny dim', style: { marginTop: '6px' } }, `${urgent.filter(x => planned.has(x.id)).length} more are in your planned service.`) : null)
           : h('div', { class: 'card good' }, h('div', { class: 'small' }, unknown.length === items.length ? h('span', {}, h('b', {}, 'Start the countdowns. '), 'Say when each part was last done (Service), or tap one here.') : `✨ Nothing due. Next: ${known[0] ? `${known[0].def.label} ${CC.dueText(known[0], dmy)}` : '—'}`),
-            unknown.length === items.length ? h('div', { class: 'rows', style: { marginTop: '8px' } }, items.filter(x => ['oil', 'brakes', 'battery', 'tyres', 'atf'].includes(x.id)).map(st => careRow(c, st))) : null)),
-      h('div', {}, c.plan ? planCard(c, now) : null, tripTeaser(c, now), moneyCard(c, now), logbook(c)),
+            unknown.length === items.length ? h('div', { class: 'rows', style: { marginTop: '8px' } }, items.filter(x => ['oil', 'brakes', 'battery', 'tyres', 'atf'].includes(x.id)).map(st => careRow(c, st))) : null),
+        ...EXU.tabTools('dash', c).filter(Boolean)),
+      h('div', {}, c.plan ? planCard(c, now) : null, tripTeaser(c, now), CZ.on(s, 'moneyDash') ? moneyCard(c, now) : null, CZ.on(s, 'logbook') ? logbook(c) : null),
       h('div', {},
         paperTiles(c, now),
         renew.length ? h('button', { class: 'card cta warn', onClick: () => ctx.go('papers') }, h('span', { class: 'ic' }, renew[0].icon), h('span', { class: 'grow' }, h('b', {}, `Renew the ${renew[0].label.replace(/ \(.*\)$/, '').toLowerCase()}`), h('span', { class: 'tiny dim' }, ` · ${renew[0].days < 0 ? `expired ${-renew[0].days} d ago` : `${renew[0].days} d left`} · ${renew[0].done}/${renew[0].total} steps`)), h('span', { class: 'arrow' }, '→')) : null,
         known.length ? h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('div', { class: 'title' }, 'Coming up'), h('button', { class: 'btn sm ghost', onClick: () => ctx.go('service') }, 'All parts →')), h('div', { class: 'rows' }, known.slice(0, 4).map(st => careRow(c, st)))) : null,
-        c.model === 'camry-2016' && !urgent.length && known.length > 8 ? h('button', { class: 'card cta', onClick: () => ctx.go('garage', 'noises') }, h('span', { class: 'ic' }, '👂'), h('span', { class: 'grow' }, h('b', {}, 'A new noise?'), h('span', { class: 'tiny dim' }, ' · the guided checks tell you what it probably is')), h('span', { class: 'arrow' }, '→')) : null)),
+        c.model === 'camry-2016' && CZ.on(s, 'noises') && !urgent.length && known.length > 8 ? h('button', { class: 'card cta', onClick: () => ctx.go('garage', 'noises') }, h('span', { class: 'ic' }, '👂'), h('span', { class: 'grow' }, h('b', {}, 'A new noise?'), h('span', { class: 'tiny dim' }, ' · the guided checks tell you what it probably is')), h('span', { class: 'arrow' }, '→')) : null)),
+    EXU.toolsHint('dash'),
   ];
 }
 function welcome() {

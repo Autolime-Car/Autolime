@@ -1,12 +1,12 @@
 // Autolime service worker: precached app shell, network-first with a short timeout, Google Fonts cached for offline.
-const CACHE = 'autolime-359b8e7bcc';
+const CACHE = 'autolime-26a2f4062c';
 const FONTS = 'autolime-fonts-v1';   // kept across releases: font files are immutable, no need to fetch them again
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Manrope:wght@500;600;700;800&family=Noto+Kufi+Arabic:wght@500;700&family=Pixelify+Sans:wght@500;700&display=swap';
 // Without these the app cannot start offline: install fails (and the old worker stays) if one is missing.
 const CORE = ['./', './index.html', './css/app.css', './js/app.js', './js/util.js', './manifest.webmanifest'];
 // Everything else in docs/js (scripts-bump.sh writes it from the folder). Fetched one by one so a
 // file that was renamed or merged away does not block the install; it just is not cached.
-const JS = ['anatomy','backup-check','car','carcare','cloudparts','custom','devstore','garage','google','hub','migrate','money','noises','obd','papers','pdftext','photos','policy','roster','store-alerts','store','trip','ui-dash','ui-fuel','ui-garage','ui-kit','ui-papers','ui-service','ui-sheets','ui-trip'];
+const JS = ['anatomy','backup-check','car','carcare','cloudparts','custom','devstore','extras','garage','google','hub','migrate','money','noises','obd','papers','pdftext','photos','policy','roster','store-alerts','store','trip','ui-dash','ui-extras','ui-fuel','ui-garage','ui-kit','ui-papers','ui-service','ui-sheets','ui-trip'];
 const ASSETS = [...JS.map(f => `./js/${f}.js`), './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png'];
 const NET_TIMEOUT = 2500;   // on weak signal ("lie-fi") serve the cached shell after 2.5 s instead of hanging on the fetch
 

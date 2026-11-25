@@ -1,5 +1,6 @@
 // Service: every part by system with its Arabic workshop name and a countdown (km or date, whichever first), the planned
 // service, the tyres, the history with what each visit cost (and its receipt), and where the intervals come from.
+import * as EXU from './ui-extras.js';
 import { h } from './util.js';
 import * as L from './car.js';
 import * as CC from './carcare.js';
@@ -29,8 +30,9 @@ export function renderService() {
       return h('div', { class: 'card' }, h('div', { class: 'group-h' }, h('span', { class: 'ic' }, icon), h('div', { class: 'title' }, name), late ? tag('late', `${late} overdue`) : null), h('div', { class: 'rows' }, rows.map(st => careRow(c, st)))); }),
     c.tyre ? tyreCard(c, now) : h('button', { class: 'card cta', onClick: () => tyreSheet(c) }, h('span', { class: 'ic' }, '🛞'), h('span', { class: 'grow' }, h('b', {}, 'Your tyres'), h('span', { class: 'tiny dim' }, ' · brand, size, DOT year, warranty')), h('span', { class: 'arrow' }, '+')),
     historyCard(c, s),
+    ...EXU.tabTools('service', c),
     h('details', { class: 'card adv' }, h('summary', {}, 'Where these numbers come from'), h('ul', { class: 'small' }, CC.SOURCES.map(([t, u]) => h('li', {}, h('a', { href: u, target: '_blank', rel: 'noopener' }, t)))),
-      h('div', { class: 'tiny dim' }, 'Intervals mix Toyota’s published schedule with what Saudi service sources and owner forums advise; the “hot & dusty” plan is Toyota’s severe-use one. Your workshop’s advice wins — change any interval by tapping the part.'))];
+      h('div', { class: 'tiny dim' }, 'Intervals mix Toyota’s published schedule with what Saudi service sources and owner forums advise; the “hot & dusty” plan is Toyota’s severe-use one. Your workshop’s advice wins — change any interval by tapping the part.')), EXU.toolsHint('service')];
 }
 function tyreCard(c, now) {
   const t = c.tyre, age = t.dot ? now.getFullYear() - +t.dot : null, months = t.fitted ? Math.round(-L.daysUntil(t.fitted, now) / 30.4) : null;

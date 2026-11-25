@@ -205,7 +205,7 @@ export function logVisit(car, { date, km = 0, items = [], cost = 0, place = '', 
   for (const id of items) if (ITEMS[id]) { const cur = out.care[id] || {}; out.care[id] = { ...cur, last: !cur.last || date >= cur.last ? date : cur.last, lastKm: !cur.last || date >= cur.last ? (k || cur.lastKm || 0) : cur.lastKm, count: (cur.count || 0) + 1 }; }
   if (k) out = addReading(out, k, date) || out;
   // lines: what each item cost and which part went in ({item, price, part}) — the parts and price log the next quote is compared with
-  const ln = (Array.isArray(lines) ? lines : []).filter(l => l && ITEMS[l.item] && (+l.price > 0 || txt(l.part))).map(l => ({ item: l.item, price: Math.round(num(l.price, 0, 1e6, 0)), part: txt(l.part, 60) }));
+  const ln = (Array.isArray(lines) ? lines : []).filter(l => l && ITEMS[l.item] && (+l.price > 0 || txt(l.part) || +l.wm > 0)).map(l => ({ item: l.item, price: Math.round(num(l.price, 0, 1e6, 0)), part: txt(l.part, 60), ...(+l.wm > 0 ? { wm: Math.round(num(l.wm, 1, 120, 12)) } : {}) }));
   const total = Math.round(num(cost, 0, 1e6, 0)) || ln.reduce((t, l) => t + l.price, 0);
   out.log = [...(out.log || []), { date, km: k, items: items.filter(i => ITEMS[i]), cost: total, place: txt(place, 60), note: txt(note, 140), what: items.length ? 'care' : 'note', ...(shop ? { shop: txt(shop, 40) } : {}), ...(ln.length ? { lines: ln } : {}), ...(photos.length ? { photos: photos.map(p => txt(p, 40)).slice(0, 10) } : {}) }].slice(-200);
   return out;
@@ -222,9 +222,9 @@ export function setInterval(car, id, { km, months, days, off } = {}) {
 
 // ───────────────────────── fuel
 /** A fill-up: litres, SAR, the reading, full tank or not. */
-export function addFuel(car, { date, litres, cost, km, full = true }) {
+export function addFuel(car, { date, litres, cost, km, full = true, station = '' }) {
   const l = Math.round(num(litres, 0, 200, 0) * 100) / 100, k = Math.round(num(km, 0, 2e6, 0)); if (!isKey(date) || !l) return car;
-  let out = { ...car, fuel: [...(car.fuel || []), { date, litres: l, cost: Math.round(num(cost, 0, 5000, 0) * 100) / 100, km: k, full: !!full }].sort((a, b) => a.date.localeCompare(b.date) || a.km - b.km).slice(-300) };
+  let out = { ...car, fuel: [...(car.fuel || []), { date, litres: l, cost: Math.round(num(cost, 0, 5000, 0) * 100) / 100, km: k, full: !!full, ...(txt(station) ? { station: txt(station, 40) } : {}) }].sort((a, b) => a.date.localeCompare(b.date) || a.km - b.km).slice(-300) };
   if (k) out = addReading(out, k, date) || out;
   return out;
 }
@@ -254,7 +254,7 @@ export function cleanCare(c) {
   const care = {};
   for (const [id, v] of Object.entries(c.care && typeof c.care === 'object' ? c.care : {})) if (ITEMS[id] && v && typeof v === 'object') care[id] = { ...(isKey(v.last) ? { last: v.last } : {}), ...(v.lastKm ? { lastKm: Math.round(num(v.lastKm, 0, 2e6, 0)) } : {}), ...(v.count ? { count: Math.round(num(v.count, 0, 999, 0)) } : {}), ...(v.km !== undefined && v.km !== '' ? { km: Math.round(num(v.km, 0, 400000, 0)) } : {}), ...(v.months !== undefined && v.months !== '' ? { months: Math.round(num(v.months, 0, 240, 0)) } : {}), ...(v.days ? { days: Math.round(num(v.days, 1, 365, 30)) } : {}), ...(v.off ? { off: true } : {}) };
   const odoLog = (Array.isArray(c.odoLog) ? c.odoLog : []).filter(r => r && isKey(r.date) && +r.km > 0).map(r => ({ date: r.date, km: Math.round(+r.km) })).slice(-120);
-  const fuel = (Array.isArray(c.fuel) ? c.fuel : []).filter(r => r && isKey(r.date) && +r.litres > 0).map(r => ({ date: r.date, litres: +r.litres, cost: +r.cost || 0, km: Math.round(+r.km || 0), full: r.full !== false })).slice(-300);
+  const fuel = (Array.isArray(c.fuel) ? c.fuel : []).filter(r => r && isKey(r.date) && +r.litres > 0).map(r => ({ date: r.date, litres: +r.litres, cost: +r.cost || 0, km: Math.round(+r.km || 0), full: r.full !== false, ...(r.station ? { station: txt(r.station, 40) } : {}) })).slice(-300);
   return { model: MODELS[c.model] ? c.model : '', severe: c.severe !== false, care, odoLog, fuel };
 }
 

@@ -7,6 +7,8 @@ import * as L from './car.js';
 import * as CC from './carcare.js';
 import * as R from './roster.js';
 import * as M from './money.js';
+import * as EX from './extras.js';
+import * as CZ from './custom.js';
 
 export const SITE_URL = 'https://autolime-car.github.io/Autolime/';
 export const CONTRACT = 2;
@@ -67,6 +69,12 @@ export function buildStatus(s, now = new Date()) {
   }
   if (car.plan?.date && car.plan.date >= t) inbox.push({ id: `plan-${car.id}-${car.plan.date}`.slice(0, 60), type: 'task', title: `Service day: ${plural(car.plan.items.length, 'item')} for ${car.name}`, date: car.plan.date, minutes: 180, pri: 1, url: `${base}?do=service`, expires: keyOf(addDays(fromKey(car.plan.date), 3)) });
 
+  // toolbox: the monthly fines check, and a journal note after a trip (Bergamot)
+  const tools = CZ.allOn(s);
+  if (tools.fines && EX.finesDue(car, now)) inbox.push({ id: `fines-${car.id}-${t.slice(0, 7)}`, type: 'task', title: 'Check Absher for traffic fines', date: t, minutes: 5, pri: 2, url: `${base}?do=papers`, expires: keyOf(addDays(now, 10)) });
+  const lastTrip = (car.trips || []).filter(x => x.closed && x.date).slice(-1)[0], lastEnd = lastTrip ? tripEnd(lastTrip) : '';
+  if (tools.share && lastTrip && lastEnd <= t && (startOfDay(now) - fromKey(lastEnd)) / 864e5 <= 10) inbox.push({ id: `trip-journal-${car.id}-${lastTrip.date}`.slice(0, 60), type: 'note', title: `Trip journal: ${lastTrip.name || 'road trip'} (${L.legsTotal(lastTrip).km || lastTrip.km || 0} km)`, date: t, url: `${base}?do=trip` });
+
   // a service slot on a day off before the planned date (or in the next 10 days when something is overdue)
   const asks = [];
   const until = car.plan?.date ? fromKey(car.plan.date) : urgent.some(x => x.state === 'late') ? addDays(now, 10) : null;
@@ -99,6 +107,18 @@ export function buildStatus(s, now = new Date()) {
       trip: trip ? { name: trip.name, date: trip.date, end: tripEnd(trip), km: trip.km || L.legsTotal(trip).km } : null,
       papers: papers.map(p => ({ kind: p.kind, date: p.date, days: p.days })),
       roster: R.has() ? R.updatedAt() : null,
+      ...(tools.share ? shared(car, trip, month, now) : {}),
     },
   };
+}
+
+/** What the other apps can use (toolbox "Tell my other apps"): spares to buy (Zest's list, Calamansi's format), the trip's days and
+ *  driving hours (Zest snacks, Sudachi's listening queue), and the car's money (any money view). Never the plate, VIN or names. */
+function shared(car, trip, month, now) {
+  const t = keyOf(now), out = {};
+  const low = EX.lowStock(car); if (low.length) out.supplies = { need: low.map(x => ({ name: x.name, level: x.qty <= 0 ? 'out' : 'low', since: t, cat: 'car' })) };
+  if (trip) { const lt = L.legsTotal(trip), end = tripEnd(trip); out.tripPlan = { date: trip.date, end, days: trip.date && end ? Math.round((fromKey(end) - fromKey(trip.date)) / 864e5) + 1 : 0, driveHours: lt.hrs || Math.round((trip.km || 0) / 95 * 10) / 10, legs: (trip.legs || []).map(l => ({ from: l.from, to: l.to, km: l.km, hrs: l.hrs, day: l.day })) }; }
+  const tc = M.trueCost(car, now);
+  out.money = { month: month.month, prevMonth: month.prev, year: month.year, perKm: tc.perKm, currency: 'SAR' };
+  return out;
 }

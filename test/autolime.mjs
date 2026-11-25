@@ -16,6 +16,7 @@ import * as HUB from '../docs/js/hub.js';
 import * as R from '../docs/js/roster.js';
 import * as AN from '../docs/js/anatomy.js';
 import * as CZ from '../docs/js/custom.js';
+import * as EX from '../docs/js/extras.js';
 import { mergeStates, sanitize } from '../docs/js/store.js';
 import { checkBackup } from '../docs/js/backup-check.js';
 import * as CP from '../docs/js/cloudparts.js';
@@ -124,6 +125,85 @@ check(!checkBackup(calamansi).ok, 'a Calamansi backup is not restored as Autolim
 const a = GA.saveShop(s0, { name: 'Phone workshop' }), b = GA.saveQuote(s0, { car: 'car1', shop: 'w1', lines: [{ item: 'oil', price: 1 }] });
 const m = mergeStates(a, b); check(Object.keys(m.workshops).length === 3 && Object.keys(m.quotes).length === 3, 'a workshop on one device and a quote on the other both survive');
 check(CZ.custom({ settings: { custom: { tabs: { hidden: ['dash', 'trip'] } } } }).tabs.hidden.join() === 'trip', 'Dash can never be hidden');
+
+console.log('the toolbox');
+{
+  const on0 = CZ.allOn(s0);
+  check(on0.logbook && on0.codes && on0.share && !on0.parked && !on0.stock, 'defaults: a few helpers on, new tools off');
+  check(EX.presetOf(on0) === 'recommended', 'the defaults are the Recommended preset');
+  const simple = CZ.setTools(s0, EX.presetMap('simple'), true), on1 = CZ.allOn(simple);
+  check(!on1.logbook && !on1.codes && !on1.anatomy && on1.share && EX.presetOf(on1) === 'simple', 'Simple turns every tool off except sharing');
+  const every = CZ.setTools(s0, EX.presetMap('all'), true); check(Object.values(CZ.allOn(every)).every(Boolean) && EX.presetOf(CZ.allOn(every)) === 'all', 'Everything turns every tool on');
+  const one = CZ.setTools(simple, { stock: true }); check(CZ.on(one, 'stock') && !CZ.on(one, 'codes') && EX.presetOf(CZ.allOn(one)) === '', 'one switch keeps the others; the preset shows as mixed');
+  check(!('bogus' in CZ.custom(CZ.setTools(s0, { bogus: true, parked: 'yes' })).tools) && !('parked' in CZ.custom(CZ.setTools(s0, { parked: 'yes' })).tools), 'unknown tools and non-boolean values are dropped');
+  check(EX.TOOLS.every(t => EX.TAB_NAME[t[3]]) && new Set(EX.TOOLS.map(t => t[0])).size === EX.TOOLS.length, 'every tool has a home tab and a unique id');
+}
+console.log('tool data is kept and cleaned (car.x)');
+{
+  const c1 = L.saveCar(s0, EX.withX(car, { tyreLog: [{ date: '2026-08-01', tread: { FL: 6.5, FR: 6.4, RL: 7, RR: 7 }, psi: { FL: 35, FR: 34 } }, { date: '2026-11-01', tread: { FL: 5.6, FR: 5.5, RL: 6.6, RR: 6.6 }, psi: { FL: 30, FR: 35, RL: 35, RR: 35 } }, { date: 'bad', tread: { FL: 3 } }], battery: [{ date: '2026-06-01', v: 12.7 }, { date: '2026-09-01', v: 12.55 }, { date: '2026-11-20', v: 12.45, note: 'after a hot week' }], junk: 1, parked: { at: 0 } })).cars.car1;
+  check(c1.x.tyreLog.length === 2 && c1.x.battery.length === 3 && !('junk' in c1.x) && !('parked' in c1.x), 'saveCar keeps tool data, drops bad rows and unknown keys');
+  const tf = EX.treadForecast(c1, now); check(tf.mm === 5.5 && tf.legal > '2027-06-01' && tf.legal < '2028-06-01' && tf.perMonth > 0.2 && tf.perMonth < 0.4, `tread forecast from the lowest wheel (${tf.legal}, ${tf.perMonth} mm/month)`);
+  const pi = EX.pressureIssues(c1); check(pi.length === 2 && pi[0].includes('front left 30'), 'pressure: a wheel 5 psi low and an uneven axle');
+  const bs = EX.batteryState(c1); check(bs.state === 'fair' && bs.falling && bs.tone === 'soon', 'battery: 12.45 V is fair, and falling over three checks');
+  const sw = EX.smartWarnings(c1, now).map(w => w.id); check(sw.includes('battery') && sw.includes('psi') && !sw.includes('tread'), `smart warnings: ${sw.join(', ')}`);
+  const sMerged = mergeStates(L.saveCar(s0, c1), s0); check(sMerged.cars.car1.x?.tyreLog?.length === 2, 'tool data syncs with the car record');
+}
+{
+  // a repeat repair and fuel use creeping up
+  let c2 = CC.logVisit(car, { date: '2026-09-01', items: ['brakes'], lines: [{ item: 'brakes', price: 220, wm: 12, part: 'Test pads' }] });
+  c2 = CC.logVisit(c2, { date: '2026-10-20', items: ['brakes'], lines: [{ item: 'brakes', price: 200 }] });
+  check(c2.log.slice(-2)[0].lines[0].wm === 12 && !('wm' in c2.log.slice(-1)[0].lines[0]), 'a warranty in months is kept on its line');
+  check(EX.smartWarnings(c2, now).some(w => w.id === 'repeat-brakes'), 'brakes done twice in 7 weeks is flagged');
+  const w = EX.warranties(c2, now); check(w.length === 1 && w[0].until === '2027-09-01' && w[0].active && EX.coveredNow(c2, 'brakes', now), 'warranty until 01/09/2027, covers the pads now');
+  check(!EX.coveredNow(c2, 'brakes', new Date('2027-10-01T10:00:00+03:00')), 'and not after it ends');
+  let c3 = { ...car, fuel: [] }; const fills = [[0, 50, 100], [700, 50, 105], [1400, 52, 108], [2100, 51, 106], [2700, 52, 108], [3250, 52, 108]];
+  fills.forEach(([k, l, sr], i) => { c3 = CC.addFuel(c3, { date: `2026-0${i + 4}-01`, litres: l, cost: sr, km: 40000 + k, full: true }); });
+  check(EX.smartWarnings(c3, now).some(w => w.id === 'fuel'), 'fuel use up 15 %+ on the last tanks is flagged');
+}
+console.log('reading a receipt');
+{
+  const r = EX.parseReceipt('TEST AUTO CENTRE\nEngine oil 5W-30 4L    120.00\nOil filter            35.50\nفحمات امامية ٢٢٠\nLabour brakes 80\nCabin filter 45\nVAT 15% 75.08\nTotal 575.58');
+  const by = Object.fromEntries(r.lines.map(l => [l.item, l]));
+  check(by.oil?.price === 155.5 && by.brakes?.price === 300 && by.cabinFilter?.price === 45 && r.total === 575.58, `oil + filter, pads + labour, cabin filter, total (${JSON.stringify(r.lines.map(l => [l.item, l.price]))})`);
+  check(!r.lines.some(l => /vat/i.test(l.text)) && by.oil.part.startsWith('Engine oil'), 'VAT is not a part; the part keeps its words');
+  check(EX.parseReceipt('').lines.length === 0 && EX.parseReceipt('hello\n12').total === 0, 'nothing recognised → nothing ticked');
+}
+console.log('fuel stations, commute, quotes, fines, stock, value, papers in the calendar, the map');
+{
+  let c4 = { ...car, fuel: [] };
+  c4 = CC.addFuel(c4, { date: '2026-10-01', litres: 40, cost: 93.2, km: 48000, station: 'Test Station A' });
+  c4 = CC.addFuel(c4, { date: '2026-10-15', litres: 45, cost: 104.85, km: 48500, station: 'Test Station A' });
+  c4 = CC.addFuel(c4, { date: '2026-11-01', litres: 30, cost: 70, km: 49000, station: 'Test Station B' });
+  const sts = EX.stations(c4); check(sts[0].name === 'Test Station A' && sts[0].visits === 2 && sts[0].perL === 2.33, 'stations: most used first, SAR a litre');
+  check(L.saveCar(s0, c4).cars.car1.fuel.filter(f => f.station).length === 3, 'the station survives saving the car');
+  const cm = EX.commute(car, 45, () => ['a', 'b', 'c', 'd'], now, 7.5, 2.33); check(cm.shifts === 4 && cm.km === 360 && cm.litres === 27 && cm.sar === 63, 'commute: 4 shifts × 45 km × 2');
+  check(EX.commute(car, 0, () => [], now) === null, 'no commute set → nothing');
+  const c5 = EX.withX({ ...car, ins: { premium: 1200 } }, { insQuotes: [{ company: 'Test Ins B', premium: 1350 }, { company: 'Test Ins A', premium: 980 }] });
+  const q = EX.compareQuotes(L.saveCar(s0, c5).cars.car1); check(q[0].company === 'Test Ins A' && q[0].cheapest && q[0].vsNow === -220 && q[1].vsNow === 150, 'quotes: cheapest first, against what you pay now');
+  const c6 = L.saveCar(s0, EX.withX(car, { fines: [{ date: '2026-11-03', sar: 300, what: 'speeding' }], finesChecked: '2026-10-01' })).cars.car1;
+  check(EX.finesDue(c6, now) && !EX.finesDue({ ...c6, x: { ...c6.x, finesChecked: '2026-11-20' } }, now), 'fines: a check is due after 30 days');
+  check(M.months(c6, now).find(m => m.key === '2026-11').fines === 300 && M.months(c6, now).find(m => m.key === '2026-11').total >= 300, 'fines count in the month\'s car money');
+  const c7 = L.saveCar(s0, EX.withX(car, { stock: [{ name: 'Test oil 4L', qty: 1, per: 1, item: 'oil' }, { name: 'Wiper fluid', qty: 3, per: 1 }] })).cars.car1;
+  const c8 = EX.useStock(c7, ['oil', 'brakes']); check(c8.x.stock[0].qty === 0 && c8.x.stock[1].qty === 3 && EX.lowStock(c8).length === 1, 'a service uses linked spares; the empty one is low');
+  const c9 = L.saveCar(s0, EX.withX(car, { values: [{ date: '2025-11-25', sar: 42000, src: 'test' }, { date: '2026-11-25', sar: 38000 }] })).cars.car1;
+  const vt = EX.valueTrend(c9); check(vt.now === 38000 && vt.perYear === 4000, 'value: 4,000 SAR lost a year');
+  const pe = EX.paperEvents(car, '2027-01-10', L.CAR_PAPERS); check(pe.length === 4 && pe.every(e => /^\d{4}-\d\d-\d\d$/.test(e.date) && e.key) && pe.some(e => e.key === 'paper-licence'), 'papers become all-day events with stable keys');
+  const ids = Object.fromEntries(TR.CITIES.flatMap(([id, en]) => [[en, id], [id, id]]));
+  const mp = EX.mapOf([{ from: 'Riyadh', to: 'Buraidah', km: 350 }, { from: 'Buraidah', to: 'Madinah', km: 500, done: true }, { from: 'Nowhere', to: 'Madinah', km: 10 }], ids, 600, 360);
+  check(mp.pts.length === 3 && mp.segs.length === 2 && mp.pts.every(p => p.x >= 0 && p.x <= 600 && p.y >= 0 && p.y <= 360) && mp.pts.find(p => p.id === 'riyadh').x > mp.pts.find(p => p.id === 'madinah').x, 'map: legs fit the frame, Riyadh east of Madinah, unknown city skipped');
+  check(EX.mapOf([{ from: 'Riyadh', to: 'Nowhere' }], ids) === null, 'map: one known city → no map');
+}
+console.log('the toolbox and the other apps (status.json)');
+{
+  const withStock = L.saveCar(s0, EX.withX(car, { stock: [{ name: 'Test oil 4L', qty: 0, per: 1, item: 'oil' }] }));
+  const st1 = HUB.buildStatus(withStock, now);
+  check(st1.extra.supplies?.need?.[0]?.name === 'Test oil 4L' && st1.extra.supplies.need[0].level === 'out' && st1.extra.money?.currency === 'SAR', 'shares spares to buy and the car money');
+  const st2 = HUB.buildStatus(CZ.setTools(withStock, { share: false }), now);
+  check(!st2.extra.supplies && !st2.extra.money && st2.extra.car, 'with sharing off only the basic car tile goes out');
+  const st3 = HUB.buildStatus(CZ.setTools(L.saveCar(s0, EX.withX(car, { finesChecked: '2026-09-01' })), { fines: true }), now);
+  check(st3.inbox.some(i => i.id.startsWith('fines-') && i.type === 'task'), 'the monthly fines check goes to Citrus\'s inbox');
+  const js = JSON.stringify(st1); check(!js.includes(car.vin || '##') && !js.includes('P0000-TEST'), 'no VIN or policy number in what is shared');
+}
 
 console.log('the Drive layout (cloud model)');
 const spl = CP.split(s0);

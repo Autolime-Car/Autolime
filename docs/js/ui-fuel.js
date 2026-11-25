@@ -1,5 +1,6 @@
 // Fuel & money: fill-ups, consumption tank by tank, money month by month (fuel, servicing, trips) and what a km really
 // costs once the insurance and the tyres are counted.
+import * as EXU from './ui-extras.js';
 import { h } from './util.js';
 import * as CC from './carcare.js';
 import * as M from './money.js';
@@ -23,8 +24,8 @@ export function renderFuel() {
         h('div', { class: 'legend' }, tc.parts.map((p, i) => h('span', {}, h('i', { style: { background: ['var(--acc)', 'var(--cyan)', 'var(--sig)', 'var(--amber)'][i] } }), `${p.label} ${p.perKm.toFixed(2)}`)))]
         : h('div', { class: 'small muted' }, 'Log a few fill-ups with the odometer, and your servicing, and this adds up fuel, servicing, the insurance premium and the tyres per km.')),
     eco.length ? h('div', { class: 'card' }, h('div', { class: 'title' }, 'Tank by tank'), ecoChart(eco.slice(-12))) : null,
-    h('div', { class: 'card' }, h('div', { class: 'title' }, `Fill-ups${fills.length ? ` · ${fills.length}` : ''}`), fills.length ? h('div', { class: 'fills' }, fills.slice(0, 20).map(f => h('div', { class: 'fill' }, h('span', { class: 'n' }, dmy(f.date)), h('span', { class: 'small' }, `${f.litres} L${f.cost ? ` · ${sar(f.cost)}` : ''}${f.km ? ` · ${f.km.toLocaleString('en')} km` : ''}${f.full ? '' : ' · part fill'}`),
-      h('button', { class: 'btn sm ghost', 'aria-label': `Remove the fill-up of ${dmy(f.date)}`, onClick: () => { const before = S(); const i = c.fuel.indexOf(f); putCar({ ...c, fuel: c.fuel.filter((_, j) => j !== i) }); ctx.render(); undoToast('Fill-up removed', before); } }, '✕')))) : h('div', { class: 'empty small' }, 'No fill-ups yet.'))];
+    h('div', { class: 'card' }, h('div', { class: 'title' }, `Fill-ups${fills.length ? ` · ${fills.length}` : ''}`), fills.length ? h('div', { class: 'fills' }, fills.slice(0, 20).map(f => h('div', { class: 'fill' }, h('span', { class: 'n' }, dmy(f.date)), h('span', { class: 'small' }, `${f.litres} L${f.cost ? ` · ${sar(f.cost)}` : ''}${f.km ? ` · ${f.km.toLocaleString('en')} km` : ''}${f.full ? '' : ' · part fill'}${f.station ? ` · ${f.station}` : ''}`),
+      h('button', { class: 'btn sm ghost', 'aria-label': `Remove the fill-up of ${dmy(f.date)}`, onClick: () => { const before = S(); const i = c.fuel.indexOf(f); putCar({ ...c, fuel: c.fuel.filter((_, j) => j !== i) }); ctx.render(); undoToast('Fill-up removed', before); } }, '✕')))) : h('div', { class: 'empty small' }, 'No fill-ups yet.')), ...EXU.tabTools('fuel', c), EXU.toolsHint('fuel')];
 }
 /** Stacked bars for 12 months; the pip marks this month. */
 function monthChart(months) {
