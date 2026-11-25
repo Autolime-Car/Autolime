@@ -15,6 +15,7 @@ import * as GA from './garage.js';
 import * as OBD from './obd.js';
 import * as NZ from './noises.js';
 import * as AN from './anatomy.js';
+import { join as joinParts, isPart } from './cloudparts.js';
 import { initKit, currentCar } from './ui-kit.js';
 import * as SH from './ui-sheets.js';
 import { renderDash } from './ui-dash.js';
@@ -26,7 +27,7 @@ import { renderGarage, garagePart, quoteSheet, partSheet } from './ui-garage.js'
 import { checkBackup, describeCounts } from './backup-check.js';
 import { h, toast, keyOf, addDays, startOfDay, fromKey, fmtDate, DAY_NAMES, MONTHS, uid } from './util.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 const CITRUS_URL = 'https://amaerys.github.io/citrus-maxima/';
 const CALAMANSI_URL = 'https://calamansi-food.github.io/Calamansi/';
 
@@ -36,7 +37,9 @@ const S = () => store.get();
 
 // ---------------- boot ----------------
 async function boot() {
-  applyTheme(); applyLook(); watchSheets();
+  applyTheme(); watchSheets();
+  await store.init().catch(e => console.warn('device store', e));   // IndexedDB's copy (two slots, other tabs) before the first screen
+  applyLook();
   for (const b of document.querySelectorAll('nav.tabs button')) b.addEventListener('click', () => go(b.dataset.view));
   $('#btnRefresh').addEventListener('click', () => refreshAll(true));
   $('#btnMore').addEventListener('click', () => show('more'));
@@ -60,32 +63,36 @@ async function boot() {
     else if (e.key === '!') { SH.accidentSheet(c); e.preventDefault(); }
     else if (e.key === '?') { shortcutsSheet(); e.preventDefault(); }
   });
-  window.addEventListener('online', () => { rt.online = true; renderSync(); flushPhotos().catch(() => {}); });
+  window.addEventListener('online', () => { rt.online = true; renderSync(); setTimeout(() => { if (G.isSignedIn()) refreshAll(false); }, 1500); });   // back online: save what waited
   window.addEventListener('offline', () => { rt.online = false; renderSync(); });
   initKit({ S, update: (fn) => store.update(fn), sheet, render: () => render(), go, undoTo, cheer, checkSetup: () => checkSetup(true), migrateNow,
     itemSheet: SH.itemSheet, partSheet, quoteSheet, takePhoto, photoUrl, binPhoto, calendarForPlan, signedIn: () => G.isSignedIn(),
     daysOff: (a, b) => HUB.daysOff(a, b), workDays: (a, b) => HUB.workDays(a, b), tank: () => CZ.custom(S()).car.tank });
   store.subscribe(() => { applyLook(); render(); publishSoon(); });
   store.onRemoteSync(scheduleRemoteSave);
-  R.load(); loadHubCache();
+  try { if (localStorage.getItem(DIRTY_KEY)) rt.saveDirty = true; } catch {}
+  R.load(); loadHubCache(); G.loadSeen(Object.keys(S().cars || {}).length > 0 && !store.recovery);
+  const back = await G.takeRedirect();   // back from Google's sign-in page (installed app): keep the token, tidy the address
   handleIncoming();
   if (!rt.handled) show(location.hash.replace('#', '') || CZ.custom(S()).start);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   const cid = S().settings.clientId;
   G.onAuthChange(() => { renderSync(); render(); });
+  G.onLateToken(() => { toast('Signed in', 'ok'); refreshAll(true, { full: true }); });   // Google answered after reporting its window closed
   G.renewOnTap(() => { render(); refreshAll(false); });
   if (cid && rt.online) {
     try { await G.init(cid); } catch (e) { console.warn(e); }
-    if (G.isSignedIn()) refreshAll(false);
-    else if (G.wasSignedIn()) { G.auth.needsSignIn = true; render(); }
+    if (G.isSignedIn() && !back?.ok) refreshAll(false);
+    else if (!G.isSignedIn() && G.wasSignedIn()) { G.auth.needsSignIn = true; render(); }
   }
+  if (back) { toast(back.ok ? 'Signed in' : back.message, back.ok ? 'ok' : 'err'); if (back.ok) refreshAll(true, { full: true }); }
   navigator.storage?.persist?.().then(ok => { rt.storagePersisted = ok; }).catch(() => {});
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { flushRemoteSave(); return; }
+    if (document.visibilityState === 'hidden') { store.flushDevice(); flushRemoteSave(); return; }
     if (G.isSignedIn() && Date.now() - (S().google.lastSync || 0) > 2 * 60000) refreshAll(false);
     render();
   });
-  window.addEventListener('pagehide', flushRemoteSave);
+  window.addEventListener('pagehide', () => { store.flushDevice(); flushRemoteSave(); });
   setInterval(() => { if (document.visibilityState === 'visible' && G.isSignedIn() && rt.online && Date.now() - (S().google.lastSync || 0) > 5 * 60000) refreshAll(false); }, 60000);
   renderSync();
 }
@@ -184,11 +191,14 @@ function renderSync() {
   txt.textContent = !rt.online ? 'offline' : rt.syncing ? 'syncing…' : '';
 }
 let saveTimer = null, saving = null;
+// "Waiting to go to Drive" is kept on the device too, so a change made just before the app closed still goes up next time.
+const DIRTY_KEY = 'autolime.drive.dirty';
+const markDirty = (on) => { rt.saveDirty = on; try { on ? localStorage.setItem(DIRTY_KEY, '1') : localStorage.removeItem(DIRTY_KEY); } catch {} };
 function scheduleRemoteSave() {
   if (!G.wasSignedIn()) return;
-  rt.saveDirty = true; clearTimeout(saveTimer);
+  markDirty(true); clearTimeout(saveTimer);
   if (!G.isSignedIn() || !rt.online) return;
-  saveTimer = setTimeout(() => saveStateNow().catch(e => console.warn('remote save failed', e.message)), 2500);
+  saveTimer = setTimeout(() => withDriveLock(() => saveStateNow()).catch(e => { console.warn('remote save failed', e.message); retryLater([e.message]); }), 2500);
 }
 function flushRemoteSave() { if (rt.saveDirty && G.isSignedIn() && rt.online) { clearTimeout(saveTimer); saveStateNow().catch(() => {}); } }
 async function saveStateNow() {
@@ -198,31 +208,49 @@ async function saveStateNow() {
     if (store.needsMerge()) await pullState(true);
     try { await G.saveRemoteState(root, stripForRemote(S())); }
     catch (e) {
-      if (!e.conflict) { rt.saveDirty = true; throw e; }
+      if (!e.conflict) { markDirty(true); throw e; }
       await pullState(true);
-      try { await G.saveRemoteState(root, stripForRemote(S()), { force: true }); } catch (e2) { rt.saveDirty = true; throw e2; }
+      try { await G.saveRemoteState(root, stripForRemote(S()), { force: true }); } catch (e2) { markDirty(true); throw e2; }
     }
+    if (!rt.saveDirty) markDirty(false);
     rt.lastSave = Date.now();
   })().finally(() => { saving = null; });
   return saving;
 }
 function stripForRemote(s) { const { outbox, google, ...rest } = s; return rest; }
 const comparable = (s) => G.fingerprint(stripForRemote(s || {}), ['updatedAt']);
+/** Read what another device changed on Drive (only the files that moved) and merge it in, record by record. If that merge
+ *  would remove many records at once (another device deleted them), a copy is kept on Drive first and you are asked. */
 async function pullState(fromConflict = false) {
-  const remote = await G.loadRemoteState(S().settings.driveFolder);
-  if (!remote) { store.merged(); scheduleRemoteSave(); return false; }
-  if (typeof remote !== 'object' || (remote.app && remote.app !== 'autolime')) throw new Error('state.json on Drive is not Autolime’s — kept your copy');
-  const force = fromConflict || store.needsMerge(); store.merged();
-  if ((!force && (remote.updatedAt || 0) === (S().updatedAt || 0)) || comparable(remote) === comparable(S())) return false;
-  const merged = mergeStates(S(), remote);
-  merged.updatedAt = Math.max(S().updatedAt || 0, remote.updatedAt || 0) + (comparable({ ...merged, updatedAt: 0 }) !== comparable({ ...remote, updatedAt: 0 }) ? 1 : 0);
+  const all = store.needsMerge();
+  const got = await G.loadRemoteState(S().settings.driveFolder, { all });
+  store.merged();
+  if (!got) { scheduleRemoteSave(); return false; }
+  if (got.core && got.core.app && got.core.app !== 'autolime') throw new Error('state.json on Drive is not Autolime’s — kept your copy (backups are in its backups folder)');
+  if (!got.changed.length) return false;
+  const before = S(), remote = joinParts(got.core || {}, got.parts);
+  const merged = mergeStates(before, remote);
+  merged.updatedAt = Math.max(before.updatedAt || 0, remote.updatedAt || 0) + 1;
+  const COLLS = Object.keys(store.RECORD_MAPS), had = COLLS.flatMap(c => Object.keys(before[c] || {}).map(id => [c, id])), lost = had.filter(([c, id]) => !merged[c]?.[id]);
+  const mass = lost.length && (lost.some(([c]) => c === 'cars') || lost.length >= Math.max(10, Math.ceil(had.length * 0.2)));   // a whole car is always worth asking about
+  if (mass) backupBefore('mass-delete');
   store.replaceState(merged);
-  if (comparable(merged) !== comparable(remote)) { if (fromConflict) rt.saveDirty = true; else scheduleRemoteSave(); }
+  if (mass) massDeleteSheet(before, lost);
+  if (got.salvaged || comparable(merged) !== comparable(remote)) { if (fromConflict) rt.saveDirty = true; else scheduleRemoteSave(); }
+  rt.lastPull = Date.now();
   return true;
+}
+/** Another device removed a car, or many records at once: gone here too, but one tap brings them back everywhere. */
+function massDeleteSheet(before, lost) {
+  const name = ([c, id]) => before[c][id]?.name || (c === 'quotes' ? 'a quote' : c === 'photos' ? 'a photo' : c);
+  const { close } = sheet([h('h2', {}, `${lost.length} thing${lost.length === 1 ? ' was' : 's were'} removed on another device`),
+    h('p', { class: 'small' }, `For example: ${lost.slice(0, 5).map(name).join(', ')}${lost.length > 5 ? '…' : ''}.`),
+    h('p', { class: 'small muted' }, 'If that was you, keep it. If not (a mistake, or a device acting up), bring them back: they return on every device. A copy from just before is also kept on Drive in Autolime’s backups.'),
+    h('div', { class: 'row wrap sh-foot' }, h('button', { class: 'btn primary grow', onClick: () => { close(); const now = S(), back = { ...now }; for (const [c, id] of lost) back[c] = { ...(back[c] || {}), [id]: before[c][id] }; store.replaceState(back, { bump: true, exact: now }); render(); toast(`${lost.length} brought back`, 'ok'); } }, 'Bring them back'), h('button', { class: 'btn ghost', onClick: () => close() }, 'Keep them removed'))]);
 }
 const WATCH_KEY = 'autolime.drive.watch';
 function loadWatch() { try { const w = JSON.parse(localStorage.getItem(WATCH_KEY) || 'null'); return w && w.root === S().settings.driveFolder ? w : null; } catch { return null; } }
-function saveWatch(w) { try { w ? localStorage.setItem(WATCH_KEY, JSON.stringify(w)) : localStorage.removeItem(WATCH_KEY); } catch {} }
+function saveWatch(w) { rt.watch = w; try { w ? localStorage.setItem(WATCH_KEY, JSON.stringify(w)) : localStorage.removeItem(WATCH_KEY); } catch {} }
 /** setup.json in Autolime's own Drive folder (left there by Claude) → the "Add your car?" sheet. */
 async function checkSetup(manual) {
   if (manual && !G.isSignedIn()) { toast('Sign in to Google first (Settings)'); return; }
@@ -233,7 +261,24 @@ async function checkSetup(manual) {
   rt.setupSeen = f.id;
   setTimeout(() => { go('dash'); SH.setupSheet(f.data, { onAdded: () => G.binSetupFile(f.id).catch(e => console.warn('setup bin', e.message)) }); }, manual ? 0 : 300);
 }
-async function refreshAll(manual, { full = false } = {}) {
+// One Autolime window talks to Drive at a time (a Web Lock shared by every tab); the others get its changes through the device store.
+function withDriveLock(fn, { wait = true } = {}) {
+  if (!navigator.locks?.request) return fn(true);
+  return navigator.locks.request('autolime-drive', wait ? {} : { ifAvailable: true }, (lock) => fn(!!lock));
+}
+async function refreshAll(manual, opts = {}) {
+  return withDriveLock((got) => { if (!got) { if (manual) toast('Another Autolime window is syncing; this one shows its changes'); return; } return refreshAllInner(manual, opts); }, { wait: false });
+}
+// After a failed sync, try again soon and then less often (30 s, 2 min, 5 min, 15 min).
+const RETRY = [30, 120, 300, 900];
+function retryLater(problems) {
+  clearTimeout(rt.retryTimer);
+  if (!problems.length) { rt.fails = 0; rt.nextRetry = 0; return; }
+  if (problems.every(p => /reconnect|sign in/i.test(p))) return;   // needs a tap, not a retry
+  const s = RETRY[Math.min(rt.fails || 0, RETRY.length - 1)]; rt.fails = (rt.fails || 0) + 1; rt.nextRetry = Date.now() + s * 1000;
+  rt.retryTimer = setTimeout(() => { if (rt.online && G.isSignedIn()) refreshAll(false); }, s * 1000);
+}
+async function refreshAllInner(manual, { full = false } = {}) {
   if (!rt.online) { if (manual) toast('Offline — Autolime syncs when you are back online'); return; }
   if (!G.isSignedIn()) { if (manual) toast(G.wasSignedIn() ? 'Google needs a tap to reconnect' : 'Sign in to Google in Settings'); render(); return; }
   if (rt.syncing) { if (manual) toast('Already syncing…'); return; }
@@ -267,9 +312,9 @@ async function refreshAll(manual, { full = false } = {}) {
     if (!problems.length) G.backupDaily(root, stripForRemote(S()), keyOf(new Date())).catch(e => console.warn('backup', e.message));
     await step('publish', publish);
     store.update(s => ({ ...s, google: { ...s.google, lastSync: Date.now() } }), { remote: false, silent: true });
-    rt.lastProblems = problems; rt.lastSyncMs = Math.round(performance.now() - t0);
+    rt.lastProblems = problems; rt.lastSyncMs = Math.round(performance.now() - t0); retryLater(problems); if (!problems.length) rt.lastGood = Date.now();
     if (manual) toast(problems.length ? 'Synced with issues — see Settings › Diagnostics' : 'Synced', problems.length ? 'err' : 'ok');
-  } catch (e) { rt.lastProblems = [e.message]; if (manual) toast(e.message, 'err'); }
+  } catch (e) { rt.lastProblems = [e.message]; retryLater([e.message]); if (manual) toast(e.message, 'err'); }
   finally { rt.syncing = false; renderSync(); render(); }
 }
 const TAG_WATCH = { autolime: 'me', mandarin: 'mandarin', citrus: 'citrus' };
@@ -279,7 +324,7 @@ function classifyChanges(changes, w) {
     if (c.id === w.me && (c.removed || c.trashed || !(c.parents || []).length)) { G.forgetFolders(); return null; }
     const par = c.parents || [];
     if (par.includes(w.me) && c.name === 'setup.json' && !c.trashed && !c.removed) plan.setup = true;
-    if (par.includes(w.me) && c.name === 'state.json' && (c.props?.rev || '') !== G.seenStateRev()) plan.state = true;
+    if (par.includes(w.me) && (c.name === 'state.json' || isPart(c.name)) && (c.props?.rev || '') !== G.seenRev(c.name)) plan.state = true;
     if (w.mandarin && par.includes(w.mandarin) && c.name === 'shifts.json') plan.hub = true;
     const tag = c.mimeType === 'application/vnd.google-apps.folder' && !c.trashed && !c.removed ? c.props?.citrusApp : '';
     if (tag && TAG_WATCH[tag] && c.id !== w[TAG_WATCH[tag]]) { G.forgetApp(tag); return null; }
@@ -481,13 +526,38 @@ function applyRestore(next, { merge = false } = {}) {
   const target = merge ? { ...mergeStates(before, next), updatedAt: Math.max(before.updatedAt || 0, next.updatedAt || 0) } : { ...next, outbox: before.outbox, google: before.google };
   try { store.replaceState(target); smokeRender(); }
   catch (e) { console.warn('restore rolled back', e); store.replaceState(before); dropPreRestore(); render(); toast(`That backup would break the app (${String(e.message).slice(0, 60)}). Nothing was changed.`, 'err'); return false; }
-  store.replaceState(S(), { bump: true, exact: merge ? null : before });
+  store.replaceState(S(), { bump: true, exact: merge ? null : before }); store.flushDevice().catch(() => {});
   render(); toast(`${merge ? 'Merged' : 'Restored'}${kept ? '' : ' (undo copy kept until you close the app)'}`, 'ok', { action: { label: 'Undo', run: undoRestore } });
   return true;
 }
 function undoRestore() { const snap = preRestore(); if (!snap?.state) { toast('Nothing to undo'); return; } store.replaceState(snap.state, { bump: true, exact: S() }); dropPreRestore(); render(); toast(`Back to your data from ${when(snap.at)}`, 'ok'); }
 
 // ---------------- SETTINGS ----------------
+/** The cloud in plain words (the family cloud model): is everything safe, where, and what happens next. */
+const ago = (t) => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString('en-GB'); };
+function cloudState() {
+  const s = S(), signed = G.isSignedIn(), waiting = rt.saveDirty, probs = rt.lastProblems || [];
+  if (!s.settings.clientId || (!signed && !G.wasSignedIn())) return { tone: 'off', head: 'Only on this device', sub: 'Sign in with Google to keep a copy on your Drive and use Autolime on your other devices.' };
+  if (!signed) return { tone: 'warn', head: 'Google needs a tap', sub: 'Everything is safe on this device. Tap Reconnect and Autolime saves to Drive again.' };
+  if (!rt.online) return { tone: 'warn', head: waiting ? 'Saved on this device, waiting for a connection' : 'Offline', sub: 'Autolime saves to Drive by itself when you are back online.' };
+  if (rt.syncing) return { tone: 'busy', head: 'Saving to Drive…', sub: '' };
+  if (probs.length) return { tone: 'bad', head: 'Not saved to Drive yet', sub: `${probs[0].replace(/^\w+: /, '')}${rt.nextRetry ? ` Trying again ${Math.max(1, Math.round((rt.nextRetry - Date.now()) / 60000))} min from now.` : ''} Nothing is lost: it is all on this device.` };
+  if (waiting) return { tone: 'busy', head: 'A change is waiting to be saved', sub: 'It goes to Drive within a few seconds.' };
+  return { tone: 'ok', head: 'Everything is saved to Drive', sub: `Last saved ${ago(rt.lastSave || s.google.lastSync)}, checked ${ago(s.google.lastSync)}.` };
+}
+function cloudCard() {
+  const s = S(), c = cloudState(), dv = store.device, n = (k) => Object.keys(s[k] || {}).length, pend = Object.values(s.photos || {}).filter(p => !p.file).length;
+  const row = (ok, label, detail) => h('div', { class: `cd-row ${ok === true ? 'ok' : ok === false ? 'bad' : ''}` }, h('span', { class: 'cd-i', 'aria-hidden': 'true' }, ok === true ? '✓' : ok === false ? '!' : '·'), h('b', {}, label), h('span', { class: 'small muted' }, detail));
+  return h('div', { class: `card cloud t-${c.tone}` }, h('div', { class: 'title' }, 'Your data'),
+    h('div', { class: 'cd-head' }, h('span', { class: 'cd-dot' }), h('div', {}, h('div', { class: 'cd-h' }, c.head), c.sub ? h('div', { class: 'small muted' }, c.sub) : null)),
+    h('div', { class: 'cd-rows' },
+      row(store.persistence.ok, 'On this device', store.persistence.ok ? `${n('cars')} car${n('cars') === 1 ? '' : 's'}, ${n('workshops')} workshops, ${n('quotes')} quotes · ${dv.idb ? 'kept twice' : 'browser storage'} · ${Math.max(1, Math.round((dv.bytes || store.persistence.bytes || JSON.stringify(s).length * 2) / 1024)).toLocaleString('en')} KB` : store.persistence.lastError),
+      row(G.isSignedIn() ? !(rt.lastProblems || []).length : null, 'On your Drive', G.isSignedIn() ? `${G.ownTagged() ? 'Car - Autolime, found by its tag' : 'Car - Autolime'} · 9 small files, only the changed ones are sent` : 'not connected'),
+      row(G.isSignedIn() ? !pend : null, 'Photos', pend ? `${pend} on this phone, going to Drive on the next sync` : G.isSignedIn() ? 'all on your Drive (photos folder)' : 'kept on this phone until you sign in'),
+      row(G.isSignedIn() ? true : null, 'Backups', G.isSignedIn() ? 'one a day on Drive (the last 14), and one before every big change' : 'download one below'),
+      row(true, 'Two devices at once', 'changes merge record by record; nothing is overwritten')),
+    h('div', { class: 'row wrap', style: { marginTop: '10px' } }, G.isSignedIn() ? h('button', { class: 'btn sm primary', onClick: () => refreshAll(true) }, '↻ Save & check now') : null, G.isSignedIn() ? h('button', { class: 'btn sm', onClick: backupsSheet }, '⟲ Backups') : null, h('button', { class: 'btn sm', onClick: downloadBackup }, '⬇ Download a copy')));
+}
 function customiseCard() {
   const c = CZ.custom(S()), set = (part, patch) => store.update(s => CZ.setCustom(s, part, patch));
   const chip = (on, label, onClick) => h('button', { class: `chip ${on ? 'sel' : ''}`, 'aria-pressed': on ? 'true' : 'false', onClick }, label);
@@ -513,7 +583,11 @@ function diagnosticsCard() {
   const rows = [
     ['Google', G.isSignedIn() ? `signed in as ${G.accountEmail() || s.google.email || '?'}` : G.wasSignedIn() ? 'session expired — tap Reconnect' : 'not signed in'],
     ['Last sync', s.google.lastSync ? `${new Date(s.google.lastSync).toLocaleString('en-GB')}${rt.syncMode ? ` · ${rt.syncMode}` : ''}${rt.lastSyncMs ? ` · ${(rt.lastSyncMs / 1000).toFixed(1)} s` : ''}` : 'never'],
-    ['Drive requests', `${G.stats.requests} sent · ${G.stats.retries} retried · ${G.stats.errors} failed · ${G.stats.skippedWrites} unchanged writes skipped`],
+    ['Drive requests', `${G.stats.requests} sent · ${G.stats.retries} retried · ${G.stats.timeouts || 0} timed out · ${G.stats.errors} failed · ${G.stats.skippedWrites} unchanged writes skipped`],
+    ['Last sign-in event', `${G.auth.lastEvent || 'none'}${G.auth.lastError ? ` · ${G.auth.lastError}` : ''}`],
+    ['Device store', `${store.device.idb ? `IndexedDB, slot ${store.device.slot || '–'}, saved ${ago(store.device.lastIdbSave)}` : `localStorage only${store.device.idbError ? ` (${store.device.idbError})` : ''}`}`],
+    ['Retry', rt.nextRetry ? `next try at ${new Date(rt.nextRetry).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} (${rt.fails} in a row)` : 'none waiting'],
+    ['Sign-in', G.redirectMode() ? 'same window (goes to Google and back)' : 'Google window (popup)'],
     ['Last Google error', G.stats.lastError || 'none'],
     ['Unsaved to Drive', rt.saveDirty ? 'yes — saves on the next sync' : 'no'],
     ['This device', `${store.persistence.ok ? 'saved' : '⚠ ' + store.persistence.lastError} · ${Math.round(store.persistence.bytes / 1024)} KB${rt.storagePersisted ? ' · protected from clean-up' : ''}`],
@@ -530,12 +604,12 @@ function diagnosticsCard() {
 }
 function renderMore() {
   const s = S(), signed = G.isSignedIn();
-  const out = [h('h1', {}, 'Settings'), uiPicker(), customiseCard()];
+  const out = [h('h1', {}, 'Settings'), cloudCard(), uiPicker(), customiseCard()];
   const cid = h('input', { type: 'text', value: s.settings.clientId, spellcheck: false, 'aria-label': 'OAuth client ID' });
   out.push(h('div', { class: 'card' }, h('div', { class: 'title' }, 'Google'),
     h('div', { class: 'small muted' }, 'Drive keeps Autolime in step on all your devices (Citrus › Life › Car - Autolime), holds your photos, tells Citrus how the car is doing and reads your days off from Mandarin. Calendar holds the service day.'),
     h('div', { class: 'row wrap', style: { marginTop: '8px' } },
-      signed ? h('button', { class: 'btn', onClick: () => { G.signOut(); saveWatch(null); render(); } }, 'Sign out') : h('button', { class: 'btn primary', onClick: async () => { try { await G.init(cid.value.trim() || s.settings.clientId); await G.signIn({ renew: G.wasSignedIn() }).catch(() => G.signIn()); toast('Signed in', 'ok'); refreshAll(true, { full: true }); } catch (e) { toast(e.message, 'err'); } } }, G.wasSignedIn() ? 'Reconnect Google' : 'Sign in with Google'),
+      signed ? h('button', { class: 'btn', onClick: () => { G.signOut(); saveWatch(null); render(); } }, 'Sign out') : h('button', { class: 'btn primary', onClick: async () => { try { const id = cid.value.trim() || s.settings.clientId; if (id !== s.settings.clientId) store.update(x => ({ ...x, settings: { ...x.settings, clientId: id } }), { remote: false }); if (!G.ready() || id !== s.settings.clientId) await G.init(id); await G.signIn({ renew: G.wasSignedIn() }); toast('Signed in', 'ok'); refreshAll(true, { full: true }); } catch (e) { toast(e.message, 'err'); } } }, G.wasSignedIn() ? 'Reconnect Google' : 'Sign in with Google'),
       signed ? h('button', { class: 'btn', onClick: () => refreshAll(true) }, '↻ Sync now') : null, signed ? h('button', { class: 'btn', onClick: backupsSheet }, '⟲ Daily backups') : null),
     signed ? h('div', { class: 'tiny muted', style: { marginTop: '8px' } }, `${s.google.email || 'signed in'}${s.google.lastSync ? ` · last sync ${new Date(s.google.lastSync).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : ''}`) : null,
     signed ? h('div', { class: 'field', style: { marginTop: '10px' } }, h('label', {}, 'Service days go on'), (() => { const sel = h('select', { onChange: (e) => store.update(x => ({ ...x, settings: { ...x.settings, planCalendarId: e.target.value } })) }, h('option', { value: 'primary' }, 'My main calendar')); G.listCalendars().then(cals => { for (const c of cals.filter(c => /owner|writer/.test(c.accessRole || 'owner') && !c.primary)) sel.append(h('option', { value: c.id, selected: s.settings.planCalendarId === c.id }, c.name)); }).catch(() => {}); return sel; })()) : null,
@@ -562,8 +636,8 @@ function eraseSheet() {
   const { close } = sheet([h('h2', {}, 'Erase Autolime on this device?'),
     h('p', { class: 'small' }, `This removes Autolime's data from this browser only (${ownKeys().length} saved items) and the photos kept on this phone.`),
     h('p', { class: 'small muted' }, signed ? 'Your Google Drive copy is not touched: sign in again and the next sync brings everything back. Photos still waiting to upload would be lost.' : 'You are not using Google sync, so nothing else holds a copy: download a backup first.'),
-    h('div', { class: 'row wrap sh-foot' }, h('button', { class: 'btn', onClick: downloadBackup }, '⬇ Backup first'), h('button', { class: 'btn danger grow', onClick: () => { for (const k of ownKeys()) try { localStorage.removeItem(k); } catch {} try { indexedDB.deleteDatabase('autolime.photos'); } catch {} close(); location.reload(); } }, 'Erase this device'), h('button', { class: 'btn ghost', onClick: () => close() }, 'Cancel'))]);
+    h('div', { class: 'row wrap sh-foot' }, h('button', { class: 'btn', onClick: downloadBackup }, '⬇ Backup first'), h('button', { class: 'btn danger grow', onClick: () => { for (const k of ownKeys()) try { localStorage.removeItem(k); } catch {} try { indexedDB.deleteDatabase('autolime.photos'); indexedDB.deleteDatabase('autolime'); } catch {} close(); location.reload(); } }, 'Erase this device'), h('button', { class: 'btn ghost', onClick: () => close() }, 'Cancel'))]);
 }
 
-window.__autolime = { refreshAll, checkSetup, publish, saveStateNow, pullState, store, G, R, rt, VERSION, HUB };   // for the console and the tests
+window.__autolime = { refreshAll, checkSetup, publish, saveStateNow, pullState, store, G, R, rt, VERSION, HUB, L, CC, GA, PH };   // for the console and the tests
 boot();

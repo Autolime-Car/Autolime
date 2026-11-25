@@ -5,10 +5,11 @@
 // screen, but phones only let Google's window open inside a tap — so renewals happen on the next tap anywhere in the
 // app (see renewOnTap), never from a timer. The one-hour token lives in localStorage on this device only.
 //
-// Drive layout (claude/drive-layout.md): Autolime's folder is found by tag (citrusApp = autolime): Citrus/Life/Car - Autolime.
-// Inside it: {state,status}.json · backups/state-YYYY-MM-DD.json · photos/<kind>/… (receipts, stickers, papers, accidents).
-// Autolime only READS other apps' files (mandarin/shifts.json for days off, calamansi/state.json once for the migration,
-// citrus/plan.json for Plan's blocks); it never writes into another app's folder.
+// Drive layout (claude/drive-layout.md, claude/cloud-model.md): Autolime's folder is found by tag (citrusApp = autolime), made
+// once inside the area tagged citrusArea = life as "Car - Autolime". Inside it: state.json (the core) + records-0…7.json (the
+// parts, cloudparts.js) · status.json · backups/ · setup.json (proposals, applied only on a tap) · photos/<kind>/.
+// Autolime only READS other apps' files (mandarin/shifts.json for days off, calamansi/state.json once for the migration);
+// it never writes into another app's folder.
 //
 // What keeps it fast and solid:
 //  - folder ids cached by path and verified once per app session (one request for the deepest folder vouches for the path)
@@ -21,6 +22,7 @@
 //  - retries with jittered backoff for dropped connections (~25 s), rate limits and 5xx; offline fails fast
 
 import { salvageJSON } from './store.js';
+import { split, isPart } from './cloudparts.js';
 
 const SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email';
 const TOKEN_KEY = 'autolime.google';     // {access_token, exp, email}
@@ -32,14 +34,17 @@ const FOLDER = 'application/vnd.google-apps.folder';
 export class GoogleError extends Error {
   constructor(message, { status = 0, auth = false, retryable = false, network = false } = {}) { super(message); this.status = status; this.auth = auth; this.retryable = retryable; this.network = network; }
 }
-export const stats = { requests: 0, retries: 0, errors: 0, lastError: '', lastErrorAt: 0, skippedWrites: 0, bytesUp: 0, bytesDown: 0, healed: 0 };
-export const auth = { needsSignIn: false, lastError: '' };
+export const stats = { requests: 0, retries: 0, errors: 0, timeouts: 0, lastError: '', lastErrorAt: 0, skippedWrites: 0, bytesUp: 0, bytesDown: 0, healed: 0 };
+export const auth = { needsSignIn: false, lastError: '', lastEvent: '' };
 
 // ════════════════════════════════════════ token & sign-in
 let token = loadToken();
 let clientId = '';
 let tokenClient = null;
 let pending = null;            // {resolve, reject} of the request in flight
+let closeGrace = null;         // after a "window closed", how long a late token is still awaited
+const lateListeners = new Set();   // told when a token arrives with nothing waiting for it
+export function onLateToken(fn) { lateListeners.add(fn); return () => lateListeners.delete(fn); }
 const authListeners = new Set();
 
 function loadToken() { try { return JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null'); } catch { return null; } }
@@ -71,27 +76,89 @@ function loadGis() {
 /** Prepare sign-in: load Google's script and the token client now, so a later tap can open the window at once. */
 export async function init(id) {
   clientId = id; if (!clientId) return false;
+  if (redirectMode()) { loadGis().then(() => setupClient()).catch(() => {}); return true; }   // the popup isn't used here
   await loadGis();
+  setupClient();
+  return true;
+}
+function setupClient() {
   tokenClient = window.google.accounts.oauth2.initTokenClient({
     client_id: clientId, scope: SCOPES, include_granted_scopes: true,
     callback: async (r) => {
-      const p = pending; pending = null; if (!p) return;
+      // a token is kept even when Google reported the window "closed" first (it can, on phones and installed apps: the
+      // window's closing is seen before its answer arrives). Dropping it here was the sign-in loop of 18/11/2026.
+      const p = pending; pending = null; clearTimeout(closeGrace);
+      auth.lastEvent = r.error ? `error: ${r.error}` : 'token';
+      if (r.access_token) {
+        const drive = window.google?.accounts?.oauth2?.hasGrantedAllScopes ? window.google.accounts.oauth2.hasGrantedAllScopes(r, 'https://www.googleapis.com/auth/drive') : true;
+        if (!drive) { auth.lastError = 'Drive was not allowed'; const e = new GoogleError('Google signed you in but did not allow Drive. Sign in again and tick the box for Google Drive.', { auth: true }); return p ? p.reject(e) : (auth.needsSignIn = true, authListeners.forEach(fn => fn(false))); }
+      }
+      if (!p && !r.access_token) return;
       if (r.error) { auth.lastError = r.error_description || r.error; return p.reject(new GoogleError(/interaction|login_required|consent/.test(r.error) ? 'Google needs you to sign in again.' : `Google sign-in: ${auth.lastError}`, { status: 401, auth: true })); }
       saveToken({ access_token: r.access_token, exp: Date.now() + (Number(r.expires_in) || 3600) * 1000 });
       auth.needsSignIn = false; auth.lastError = '';
       if (!token.email) { try { const u = await userInfo(); saveToken({ email: u.email || '' }); } catch {} }
-      p.resolve(token);
+      if (p) p.resolve(token); else for (const fn of lateListeners) try { fn(token); } catch {}
     },
     error_callback: (e) => {
-      const p = pending; pending = null; if (!p) return;
+      auth.lastEvent = `window: ${e?.type || 'error'}`;
+      if (!pending) return;
+      // "closed" can come before the answer: wait a little for the token before giving up (no second window is opened)
+      if (e?.type === 'popup_closed') { const p = pending; clearTimeout(closeGrace); closeGrace = setTimeout(() => { if (pending === p) { pending = null; preferRedirect(); p.reject(new GoogleError('Google\'s window lost its answer. Tap Sign in once more: this time Google opens in the same window and comes back here.', { auth: true })); } }, 8000); return; }
+      const p = pending; pending = null;
       p.reject(new GoogleError(e?.type === 'popup_closed' ? 'Sign-in window closed.' : e?.type === 'popup_failed_to_open' ? 'The browser blocked Google\'s window — tap again.' : `Google sign-in: ${e?.message || e?.type || 'failed'}`, { auth: true }));
     },
   });
   return true;
 }
 
+// ──────────── sign-in by going to Google and back (no popup)
+// An app installed on the home screen (Android especially) often never receives the popup's answer: the window closes,
+// the token is lost, and the owner signs in again and again (18/11/2026, twice). So installed apps — and any device
+// where the popup failed once — send the whole page to Google and read the token from the address Google sends back to.
+// The return address (this page, e.g. https://autolime-car.github.io/Autolime/) must be listed under "Authorized
+// redirect URIs" of the shared OAuth client.
+const MODE_KEY = 'autolime.google.mode';      // 'redirect' after a popup failed on this device
+const BACK_KEY = 'autolime.google.back';      // {state, hash, at} while away at Google
+export const returnAddress = () => location.origin + location.pathname.replace(/index\.html$/, '');
+const installed = () => { try { return matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: minimal-ui)').matches || navigator.standalone === true; } catch { return false; } };
+export function redirectMode() { try { if (localStorage.getItem(MODE_KEY) === 'redirect') return true; } catch {} return installed(); }
+function preferRedirect() { try { localStorage.setItem(MODE_KEY, 'redirect'); } catch {} }
+
+/** Leave for Google's sign-in page; the app opens again with the token in the address. */
+export function signInRedirect({ renew = false } = {}) {
+  if (!clientId) throw new GoogleError('Add the Google client ID in Settings first.', { auth: true });
+  const state = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('');
+  try { localStorage.setItem(BACK_KEY, JSON.stringify({ state, hash: location.hash, at: Date.now() })); } catch {}
+  const q = new URLSearchParams({ client_id: clientId, redirect_uri: returnAddress(), response_type: 'token', scope: SCOPES, include_granted_scopes: 'true', state });
+  if (!renew) q.set('prompt', 'consent');
+  if (token?.email) q.set('login_hint', token.email);
+  auth.lastEvent = 'redirect: away';
+  location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + q);
+  return new Promise(() => {});   // the page is leaving
+}
+
+/** On start-up: if Google just sent us back, keep the token and tidy the address. → null | {ok:true} | {ok:false, message} */
+export async function takeRedirect() {
+  const h = location.hash || '';
+  if (!/[#&](access_token|error)=/.test(h)) return null;
+  const r = Object.fromEntries(new URLSearchParams(h.slice(1)));
+  let back = null; try { back = JSON.parse(localStorage.getItem(BACK_KEY) || 'null'); localStorage.removeItem(BACK_KEY); } catch {}
+  history.replaceState(null, '', location.pathname + location.search + (back?.hash && !/access_token|error=/.test(back.hash) ? back.hash : '#more'));
+  if (!back || back.state !== r.state) { auth.lastEvent = 'redirect: state mismatch'; return { ok: false, message: 'That Google answer was not for this sign-in. Tap Sign in again.' }; }
+  if (r.error) { auth.lastEvent = `redirect: ${r.error}`; auth.lastError = r.error; return { ok: false, message: r.error === 'access_denied' ? 'Google sign-in was cancelled.' : `Google sign-in: ${r.error}` }; }
+  if (!String(r.scope || '').split(/\s+/).includes('https://www.googleapis.com/auth/drive')) { auth.lastEvent = 'redirect: no drive'; auth.lastError = 'Drive was not allowed'; return { ok: false, message: 'Google signed you in but did not allow Drive. Sign in again and tick the box for Google Drive.' }; }
+  saveToken({ access_token: r.access_token, exp: Date.now() + (Number(r.expires_in) || 3600) * 1000 });
+  auth.needsSignIn = false; auth.lastError = ''; auth.lastEvent = 'redirect: token';
+  if (!token.email) { try { const u = await userInfo(); saveToken({ email: u.email || '' }); } catch {} }
+  return { ok: true };
+}
+
+/** The token client is ready (Google's script loaded at start-up): a tap can open the window at once, inside the tap. */
+export const ready = () => !!tokenClient || (redirectMode() && !!clientId);
 /** Get a token. Must run inside a tap on phones. `renew`: the account already agreed, so no consent screen. */
 export function signIn({ renew = false } = {}) {
+  if (redirectMode() && clientId) return signInRedirect({ renew });
   if (pending) return pending.promise;
   if (!tokenClient) return Promise.reject(new GoogleError(clientId ? 'Google sign-in is still loading — tap again.' : 'Add the Google client ID in Settings first.', { auth: true }));
   let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; });
@@ -108,6 +175,7 @@ export function renewOnTap(onRenewed) {
   if (tapHooked) return; tapHooked = true;
   document.addEventListener('pointerdown', () => {
     if (isSignedIn() || !wasSignedIn() || !tokenClient || pending || navigator.onLine === false) return;
+    if (redirectMode()) { auth.needsSignIn = true; for (const fn of authListeners) fn(false); return; }   // leaving the page needs a deliberate tap on Reconnect
     signIn({ renew: true }).then(() => onRenewed?.()).catch(() => { auth.needsSignIn = true; for (const fn of authListeners) fn(false); });
   }, { capture: true });
 }
@@ -130,12 +198,17 @@ async function gfetch(url, opts = {}) {
   let res, msg = '';
   for (let attempt = 0; ; attempt++) {
     stats.requests++;
-    try { res = await fetch(url, { ...opts, cache: 'no-store', headers: { ...(opts.headers || {}), Authorization: `Bearer ${token.access_token}` } }); }
+    // every request has a deadline: a hung connection ("lie-fi") must never freeze syncing until the app is reopened
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, limit = opts.timeout || (opts.body && String(opts.body).length > 200000 ? 120000 : 30000);
+    const timer = ctl ? setTimeout(() => ctl.abort(), limit) : null;
+    try { res = await fetch(url, { ...opts, timeout: undefined, signal: ctl?.signal, cache: 'no-store', headers: { ...(opts.headers || {}), Authorization: `Bearer ${token.access_token}` } }); }
     catch (e) {
+      clearTimeout(timer); if (e?.name === 'AbortError') stats.timeouts = (stats.timeouts || 0) + 1;
       // a dropped connection: repeat requests that are safe to send twice, for ~25 s
       if ((SAFE.test(method) || opts.retrySafe) && attempt < 5) { stats.retries++; await backoff(attempt); continue; }
-      fail('Network error'); throw new GoogleError('Google couldn\'t be reached — the connection dropped.', { network: true, retryable: true });
+      fail(e?.name === 'AbortError' ? 'Timed out' : 'Network error'); throw new GoogleError(e?.name === 'AbortError' ? 'Google took too long to answer — Autolime tries again shortly.' : 'Google couldn\'t be reached — the connection dropped.', { network: true, retryable: true });
     }
+    clearTimeout(timer);
     msg = '';
     if (res.status === 403 || res.status === 429) { try { const j = await res.clone().json(); msg = `${j?.error?.message || ''} ${(j?.error?.errors || []).map(x => x.reason).join(' ')}`; } catch {} }
     const slowDown = res.status === 429 || (res.status === 403 && /rate ?limit|quota|userRateLimitExceeded|rateLimitExceeded/i.test(msg));
@@ -237,7 +310,7 @@ export function knownFolderIds() { return { ...ids }; }
 /** Check every cached folder id again on next use (a full sync does this). */
 export function reverify() { verified.clear(); }
 /** Forget every cached id (a watched folder was deleted or moved): paths are looked up again, created if missing. */
-export function forgetFolders() { ids = {}; persistIds(); verified.clear(); seenState = null; }
+export function forgetFolders() { ids = {}; persistIds(); verified.clear(); seenState = null; for (const k of Object.keys(tagCache)) delete tagCache[k]; }
 
 const FIELDS = 'id,name,mimeType,createdTime,modifiedTime,size,md5Checksum,appProperties,parents,trashed';
 async function list(parentId, { name, folders, extra, all } = {}) {
@@ -373,72 +446,75 @@ export async function changesSince(tokenStr, maxPages = 20) {
 }
 
 // ════════════════════════════════════════ the hub
-// Folders are found by tag, never by path (claude/drive-layout.md): every app folder carries appProperties.citrusApp = '<id>'.
-// Citrus moves and renames them; Autolime only follows the tag. A new Autolime folder is made once, inside the area folder
-// tagged citrusArea = 'life' (Citrus/Life), named "Car - Autolime", and tagged at once. If even the area is missing,
-// Citrus/Life is made by name (Citrus tags and merges it on its next organise run).
+// Folders are found by their tag, never by path (claude/drive-layout.md): every app folder carries appProperties.citrusApp =
+// "<id>", so Citrus can move and rename it and Autolime still finds it. Autolime never renames or moves a folder.
 export const APP = 'autolime';
-export const AREA = 'life', FOLDER_NAME = 'Car - Autolime';
+export const TAG = 'citrusApp';
+const tagCache = {};   // app → folder id (or null), checked once per app session
 const tagInflight = new Map();
-
-/** Every folder tagged citrusApp = app (or citrusArea = area), anywhere in My Drive, oldest first. */
-export async function taggedFolders(app, key = 'citrusApp') {
-  const p = new URLSearchParams({ q: `mimeType = '${FOLDER}' and trashed = false and appProperties has { key='${key}' and value='${q(app)}' }`, fields: 'files(id,name,parents,createdTime)', pageSize: '20', spaces: 'drive' });
-  const j = await gfetch(`${DRIVE}/files?${p}`);
-  return (j.files || []).sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''));
-}
-async function tagFolder(id, app) {
-  await gfetch(`${DRIVE}/files/${encodeURIComponent(id)}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appProperties: { citrusApp: app } }) });
-}
-/** An app's folder, by tag (the oldest if there are several). Only Autolime's own folder is ever created; another app's
- *  folder is read where its tag says, never made, moved or tagged here. */
-export function appFolder(root, app, { create = app === APP } = {}) {
-  const key = `tag:${app}`, own = app === APP, flight = key + (create ? '+' : '');
-  if (tagInflight.has(flight)) return tagInflight.get(flight);
+/** The folder tagged citrusApp=<app> (the oldest when there are several), or null. */
+export function findTagged(app) {
+  if (app in tagCache) return Promise.resolve(tagCache[app]);
+  if (tagInflight.has(app)) return tagInflight.get(app);
   const p = (async () => {
-    if (ids[key] && await exists(ids[key])) return ids[key];
-    if (ids[key]) { delete ids[key]; persistIds(); }
-    const tagged = await taggedFolders(app);
-    let id = tagged[0]?.id || null;
-    if (!id && own && create) {
-      const area = (await taggedFolders(AREA, 'citrusArea'))[0]?.id || await ensurePath([root || 'Citrus', 'Life']);
-      const found = (await list(area, { name: FOLDER_NAME, folders: true })).sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''))[0];
-      id = found?.id || await mkdir(FOLDER_NAME, area, 'Autolime: the car app. Its data; Citrus keeps this folder in place.');
-      await tagFolder(id, app).catch(e => console.warn('tag folder', e.message));
-    }
-    if (id) { ids[key] = id; verified.add(id); persistIds(); }
-    return id;
-  })().finally(() => tagInflight.delete(flight));
-  tagInflight.set(flight, p);
-  return p;
+    const cached = ids[`tag:${app}`];
+    if (cached && await exists(cached)) { const f = await fileMeta(cached, 'id,appProperties,trashed').catch(() => null); if (f && !f.trashed && f.appProperties?.[TAG] === app) return (tagCache[app] = cached); }
+    const qs = new URLSearchParams({ q: `mimeType = '${FOLDER}' and trashed = false and appProperties has { key='${TAG}' and value='${q(app)}' }`, fields: 'files(id,name,parents,createdTime)', spaces: 'drive', pageSize: '20' });
+    const j = await gfetch(`${DRIVE}/files?${qs}`);
+    const pick = (j.files || []).sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''))[0];
+    if (pick) { ids[`tag:${app}`] = pick.id; verified.add(pick.id); } else delete ids[`tag:${app}`];
+    persistIds();
+    return (tagCache[app] = pick ? pick.id : null);
+  })().finally(() => tagInflight.delete(app));
+  tagInflight.set(app, p); return p;
 }
-const meDir = (root) => appFolder(root, APP);
-/** A folder inside one Autolime owns (backups/), found by name under its parent's id, so it moves with the parent. */
-async function childDir(parentId, name, create = true) {
-  const key = `${parentId}/${name}`;
+async function tagFolder(id, app) { await gfetch(`${DRIVE}/files/${encodeURIComponent(id)}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appProperties: { [TAG]: app } }) }); ids[`tag:${app}`] = id; persistIds(); tagCache[app] = id; }
+export const AREA = 'life', FOLDER_NAME = 'Car - Autolime';
+/** An area folder (citrusArea = life): where a new app folder is made. */
+async function areaFolder(root) {
+  const qs = new URLSearchParams({ q: `mimeType = '${FOLDER}' and trashed = false and appProperties has { key='citrusArea' and value='${q(AREA)}' }`, fields: 'files(id,createdTime)', spaces: 'drive', pageSize: '10' });
+  const j = await gfetch(`${DRIVE}/files?${qs}`), pick = (j.files || []).sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''))[0];
+  return pick ? pick.id : ensurePath([root || 'Citrus', 'Life']);   // Citrus tags and merges a by-name area on its next organise run
+}
+/** A folder by tag. own: Autolime's folder, made once inside the Life area (never by an old path) and tagged at once.
+ *  Another app's folder is only ever read where its tag says. */
+export async function folderOf(root, app, { own = false } = {}) {
+  const t = await findTagged(app); if (t) return t;
+  if (!own) return null;
+  const area = await areaFolder(root);
+  const found = (await list(area, { name: FOLDER_NAME, folders: true })).sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''))[0];
+  const id = found?.id || await mkdir(FOLDER_NAME, area);
+  await tagFolder(id, app).catch(e => console.warn('tag', e.message));
+  return id;
+}
+/** Forget the cached folder of an app (its tag now points elsewhere): the next read looks it up again. */
+export function forgetApp(app) { delete ids[`tag:${app}`]; delete tagCache[app]; persistIds(); }
+const meDir = (root) => folderOf(root, APP, { own: true });
+/** A sub-folder (backups) inside a folder found by id, created when asked. */
+async function childFolder(parentId, name, create = true) {
+  const key = `child:${parentId}/${name}`;
   if (ids[key] && await exists(ids[key])) return ids[key];
-  const found = (await list(parentId, { name, folders: true })).sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''));
-  const id = found[0]?.id || (create ? await mkdir(name, parentId) : null);
+  const found = (await list(parentId, { name, folders: true })).sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''))[0];
+  const id = found ? found.id : create ? await mkdir(name, parentId) : null;
   if (id) { ids[key] = id; verified.add(id); persistIds(); }
   return id;
 }
-const backupsDir = async (root, create = true) => { const me = await meDir(root); return me ? childDir(me, 'backups', create) : null; };
+const backupsDir = async (root, create = true) => { const me = await meDir(root); return childFolder(me, 'backups', create); };
+/** Whether Autolime found its own folder by tag this session (for status.json › drive). */
+export const ownTagged = () => !!tagCache[APP];
 
 /** Folder ids Autolime watches in the changes feed: its own folder, and the folders of the apps it reads (Mandarin, Citrus). */
 export async function watchedFolders(root) {
-  const me = await meDir(root);
-  const [mandarin, citrus] = await Promise.all([appFolder(root, 'mandarin'), appFolder(root, 'citrus')]);
+  const [me, mandarin, citrus] = await Promise.all([meDir(root), folderOf(root, 'mandarin'), folderOf(root, 'citrus')]);
   return { me, mandarin: mandarin || '', citrus: citrus || '' };
 }
-/** Forget the cached folder of an app (its tag now points elsewhere): the next read looks it up again. */
-export function forgetApp(app) { delete ids[`tag:${app}`]; persistIds(); }
 
-/** Autolime's small public file: status.json (what Citrus shows). */
+/** Autolime's small public file in its own folder: status.json (what Citrus shows). */
 export async function writeOwnFile(root, name, obj, { omit = ['updatedAt'] } = {}) { const dir = await meDir(root); return putJson(dir, name, obj, { omit, healTwins: true }); }
 
-/** Another app's JSON file, read only, from the folder its tag points to (old path hub/<app> until tagged). null when it is not there. Twins are left alone (not ours to tidy). */
+/** Another app's JSON file, read only, from its tagged folder. null when it is not there. Twins are left alone (not ours to tidy). */
 export async function readOtherFile(root, app, name) {
-  const dir = await appFolder(root, app, { create: false }); if (!dir) return null;
+  const dir = await folderOf(root, app); if (!dir) return null;
   const { file } = await findFile(dir, name); if (!file) return null;
   const data = await readJsonFile(file);
   return data && typeof data === 'object' ? { data, modifiedTime: file.modifiedTime, id: file.id } : null;
@@ -446,7 +522,7 @@ export async function readOtherFile(root, app, name) {
 
 /** A setup file left in Autolime's own folder (setup.json, e.g. by Claude): {data, id}, or null. Never applied here: the app proposes it. */
 export async function readSetupFile(root) {
-  const dir = await appFolder(root, APP, { create: false }); if (!dir) return null;
+  const dir = await findTagged(APP); if (!dir) return null;
   const { file } = await findFile(dir, 'setup.json'); if (!file) return null;
   const data = await readJsonFile(file);
   return data && typeof data === 'object' ? { data, id: file.id } : null;
@@ -454,42 +530,88 @@ export async function readSetupFile(root) {
 /** After "Add it": the setup file goes to the bin (Drive keeps it 30 days). */
 export async function binSetupFile(id) { await trash(id); }
 
-// ── Autolime's own state: read with its revision, written only if nobody else wrote it since
-let seenState = null;   // {id, rev, modifiedTime} of the state.json we last read or wrote
-export async function loadRemoteState(root) {
+// ── Autolime's own state on Drive: a small core (state.json) + 16 part files (media-NN.json, cloudparts.js). Each file carries its
+// revision in appProperties.rev; one folder listing tells which files another device wrote since we last read or wrote them.
+// Only those are downloaded, and only the files whose content changed are uploaded (fingerprint in appProperties.h).
+let seenState = null;        // {id, rev, modifiedTime} of state.json as last read or written (kept for the changes feed)
+let seen = {};               // file name → rev we last read or wrote (kept across sessions while this device's copy holds them)
+const SEEN_KEY = 'autolime.drive.seen';
+/** Remember which revisions this device already holds, so a new session downloads only what changed. `holds`: this device
+ *  still has its library (false after an erase or a recovery: then everything is read again). */
+export function loadSeen(holds) { try { const j = JSON.parse(localStorage.getItem(SEEN_KEY) || 'null'); seen = holds && j && typeof j === 'object' ? j : {}; } catch { seen = {}; } }
+function saveSeen() { try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch {} }
+const fileIds = {};          // file name → Drive id (this session)
+const mine = (f) => f.name === 'state.json' || isPart(f.name);
+/** Our files in our folder, the newest of each name; older twins (an earlier race) go to the trash. */
+async function listMine(dir) {
+  const files = (await list(dir, { all: true })).filter(mine), by = {};
+  for (const f of files.sort((x, y) => (y.modifiedTime || '').localeCompare(x.modifiedTime || ''))) { if (by[f.name]) { trash(f.id).catch(() => {}); stats.healed++; } else by[f.name] = f; }
+  for (const [n, f] of Object.entries(by)) { fileIds[n] = f.id; if (f.appProperties?.h) lastWritten.set(`${dir}/${n}`, f.appProperties.h); }   // what Drive holds: an unchanged part is never uploaded again
+  return by;
+}
+/** A file we could not read: renamed aside (never overwritten), so whatever is in it can still be recovered by hand. */
+async function setAside(dir, f) {
+  await gfetch(`${DRIVE}/files/${encodeURIComponent(f.id)}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name.replace(/\.json$/, `.damaged-${new Date().toISOString().replace(/[:.]/g, '-')}.json`) }) }).catch(() => {});
+  delete fileIds[f.name]; delete seen[f.name]; delete ids[`file:${dir}/${f.name}`]; persistIds(); lastWritten.delete(`${dir}/${f.name}`); stats.healed++;   // the next save creates a fresh file of that name
+}
+/** Read what moved on Drive since we last looked. all: read every file (a fresh device, a full pass, a recovery).
+ *  → null when Autolime has nothing on Drive yet, else { core (or null), parts {name: data}, changed: [names], salvaged } */
+export async function loadRemoteState(root, { all = false } = {}) {
   const dir = await meDir(root);
-  const { file, twins } = await findFile(dir, 'state.json');
-  if (!file) { seenState = null; return null; }
-  for (const t of twins) trash(t.id).catch(() => {});
-  ids[`file:${dir}/state.json`] = file.id; persistIds();
-  let data = await readJsonFile(file);
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    // unreadable (cut off, garbage): merge in whatever can still be read, and move the damaged file aside instead of overwriting it
-    let text = ''; try { text = decode(await downloadFile(file.id)); } catch {}
-    data = salvageJSON(text);
-    await gfetch(`${DRIVE}/files/${encodeURIComponent(file.id)}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `state.damaged-${new Date().toISOString().replace(/[:.]/g, '-')}.json` }) }).catch(() => {});
-    delete ids[`file:${dir}/state.json`]; persistIds(); lastWritten.delete(`${dir}/state.json`); seenState = null; stats.healed++;
-    return data;
-  }
-  seenState = { id: file.id, rev: file.appProperties?.rev || '', modifiedTime: file.modifiedTime };
-  if (file.appProperties?.h) lastWritten.set(`${dir}/state.json`, file.appProperties.h); else lastWritten.delete(`${dir}/state.json`);
-  return data;
+  const by = await listMine(dir);
+  if (!Object.keys(by).length) { seenState = null; seen = {}; return null; }
+  const want = Object.values(by).filter(f => all || !f.appProperties?.rev || f.appProperties.rev !== seen[f.name]);
+  const out = { core: null, parts: {}, changed: [], salvaged: false };
+  await pool(want, 4, async (f) => {
+    let data = await readJsonFile(f);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      let text = ''; try { text = decode(await downloadFile(f.id)); } catch {}
+      data = salvageJSON(text); await setAside(dir, f); out.salvaged = true;
+      if (!data) return;
+    } else {
+      seen[f.name] = f.appProperties?.rev || '';
+      if (f.appProperties?.h) lastWritten.set(`${dir}/${f.name}`, f.appProperties.h); else lastWritten.delete(`${dir}/${f.name}`);
+      if (f.name === 'state.json') seenState = { id: f.id, rev: seen[f.name], modifiedTime: f.modifiedTime };
+    }
+    if (f.name === 'state.json') out.core = data; else out.parts[f.name] = data;
+    out.changed.push(f.name);
+  });
+  saveSeen();
+  return out;
 }
-/** Has another device written state.json since we last read it? (one metadata request) */
-export async function remoteStateMoved() {
-  if (!seenState?.id) return false;
-  try { const m = await fileMeta(seenState.id, 'id,modifiedTime,trashed,appProperties'); return !m || m.trashed ? true : (m.appProperties?.rev || '') !== seenState.rev; }
-  catch (e) { if (e.status === 404) return true; throw e; }
+/** Has another device written any of our files since we last read them? (one listing) → names that moved */
+export async function remoteMoved(root) {
+  const dir = await meDir(root), by = await listMine(dir);
+  return Object.values(by).filter(f => (f.appProperties?.rev || '') !== seen[f.name]).map(f => f.name);   // never read (undefined) counts as moved
 }
+/** Write the state as core + parts: only files whose content changed are uploaded. Refused (conflict) when another device wrote
+ *  one of our files since we read it, unless force (the caller has just merged it). → { written, skipped } */
 export async function saveRemoteState(root, state, { force = false } = {}) {
   const dir = await meDir(root);
-  if (!force && await remoteStateMoved()) { const e = new GoogleError('Another device saved first.', { status: 409 }); e.conflict = true; throw e; }
-  const rev = `${Date.now().toString(36)}.${Math.random().toString(36).slice(2, 7)}`;
-  const r = await putJson(dir, 'state.json', state, { props: { rev }, fileId: seenState?.id || null, always: force });
-  if (!r.skipped) seenState = { id: r.id, rev, modifiedTime: r.modifiedTime };
-  return r;
+  if (!force) { const moved = await remoteMoved(root); if (moved.length) { const e = new GoogleError('Another device saved first.', { status: 409 }); e.conflict = true; e.moved = moved; throw e; } }
+  const { core, parts } = split(state), files = [['state.json', core], ...Object.entries(parts)];
+  let written = 0, skipped = 0;
+  await pool(files, 4, async ([name, obj]) => {
+    const rev = `${Date.now().toString(36)}.${Math.random().toString(36).slice(2, 7)}`;
+    const r = await putJson(dir, name, obj, { props: { rev }, fileId: fileIds[name] || null, always: false });
+    if (r.skipped) { skipped++; return; }
+    written++; seen[name] = rev; fileIds[name] = r.id;
+    if (name === 'state.json') seenState = { id: r.id, rev, modifiedTime: r.modifiedTime };
+  });
+  saveSeen();
+  return { written, skipped };
 }
-export function seenStateRev() { return seenState?.rev || ''; }
+/** A small worker pool: at most n at once, and the first real failure stops the rest (no half-hearted Promise.all). */
+async function pool(items, n, fn) {
+  let i = 0, err = null;
+  const run = async () => { while (!err && i < items.length) { const it = items[i++]; try { await fn(it); } catch (e) { err = e; } } };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, run));
+  if (err) throw err;
+}
+export function seenStateRev() { return seen['state.json'] || ''; }
+export const seenRev = (name) => seen[name] || '';
+/** Forget what was read (after a restore or a recovery, so the next pull reads every file). */
+export function forgetSeen() { seen = {}; seenState = null; saveSeen(); }
 
 // ── daily backups of state.json: backups/state-YYYY-MM-DD.json, the newest 14 kept
 export async function backupDaily(root, state, dayKey) {
@@ -523,7 +645,7 @@ export async function readBackup(id) { return readJsonFile({ id }); }
 // ════════════════════════════════════════ photos (receipts, the windscreen sticker, papers, accidents) in Autolime's own folder
 /** Upload a picture into photos/<kind>/ in Autolime's folder. → { id, name } */
 export async function uploadPhoto(root, kind, name, blob, props = {}) {
-  const me = await meDir(root), photos = await childDir(me, 'photos'), dir = await childDir(photos, kind);
+  const me = await meDir(root), photos = await childFolder(me, 'photos'), dir = await childFolder(photos, kind);
   const boundary = 'autolime' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const meta = { name, parents: [dir], mimeType: blob.type || 'image/jpeg', appProperties: { autolime: kind, ...props } };
   const head = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${meta.mimeType}\r\n\r\n`;

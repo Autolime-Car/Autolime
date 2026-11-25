@@ -12,7 +12,8 @@ export function createFakeGoogle({ email = 'tester@example.com' } = {}) {
   let changeSeq = 1;
   const touch = (f) => { f.modifiedTime = now(); changes.push({ seq: ++changeSeq, fileId: f.id }); return f; };
   const meta = (f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, createdTime: f.createdTime, size: String(f.content.length), parents: f.parents, trashed: !!f.trashed, appProperties: f.appProperties || {} });
-  const faults = { status500: 0, status401: 0, offline: false, gisFail: false, dropNextCreate: 0 };
+  const faults = { status500: 0, status401: 0, offline: false, gisFail: false, dropNextCreate: 0, hang: 0, delay: 0 };
+  const counts = { up: 0, down: 0, list: 0, upNames: [], downNames: [] };
   const now = () => new Date().toISOString();
   const FOLDER = 'application/vnd.google-apps.folder';
 
@@ -40,7 +41,7 @@ export function createFakeGoogle({ email = 'tester@example.com' } = {}) {
     const par = /'([^']+)' in parents/.exec(q); if (par && !f.parents.includes(par[1])) return false;
     const nm = /name\s*=\s*'((?:[^'\\]|\\.)*)'/.exec(q); if (nm && f.name !== nm[1].replace(/\\'/g, "'")) return false;
     if (/mimeType\s*=\s*'application\/vnd\.google-apps\.folder'/.test(q) && !q.includes(' or ') && f.mimeType !== FOLDER) return false;
-    const tg = /appProperties has \{ key='([^']+)' and value='([^']+)' \}/.exec(q); if (tg && (f.appProperties || {})[tg[1]] !== tg[2]) return false;
+    const ap = /appProperties has \{ key='([^']+)' and value='([^']+)' \}/.exec(q); if (ap && (f.appProperties || {})[ap[1]] !== ap[2]) return false;
     const nc = /name contains '([^']+)'/.exec(q);
     if (q.includes('spreadsheetml') || q.includes("contains '.xlsx'")) { if (!(f.mimeType.includes('spreadsheet') || /\.xlsx$/.test(f.name))) return false; }
     else if (nc && !f.name.includes(nc[1])) return false;
@@ -64,12 +65,15 @@ export function createFakeGoogle({ email = 'tester@example.com' } = {}) {
     if (faults.status401 > 0) { faults.status401--; log.push(short + ' 401'); return json(route, 401, { error: { message: 'Invalid Credentials' } }); }
     if (faults.status500 > 0) { faults.status500--; log.push(short + ' 500'); return json(route, 500, { error: { message: 'backend error' } }); }
     log.push(short);
+    if (faults.hang > 0 && url.hostname === 'www.googleapis.com' && !url.pathname.includes('userinfo')) { faults.hang--; log.push('  ↳ hangs (never answers)'); return; }   // a dead connection: the request just sits there
+    if (faults.delay) await new Promise(r => setTimeout(r, faults.delay));
     const p = url.pathname;
     // userinfo
     if (p === '/oauth2/v3/userinfo') return json(route, 200, { email });
     // ---- Drive ----
     if (p === '/drive/v3/files' && method === 'GET') {
       const q = url.searchParams.get('q') || ''; const spaces = url.searchParams.get('spaces');
+      counts.list++;
       const list = [...files.values()].filter(f => matches(f, q, spaces)).sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime));
       return json(route, 200, { files: list.map(meta) });
     }
@@ -84,7 +88,7 @@ export function createFakeGoogle({ email = 'tester@example.com' } = {}) {
     let m;
     if ((m = /^\/drive\/v3\/files\/([^/]+)$/.exec(p)) && method === 'GET') {
       const f = files.get(m[1]); if (!f || f.trashed) return json(route, 404, { error: { message: 'File not found' } });
-      if (url.searchParams.get('alt') === 'media') return route.fulfill({ status: 200, contentType: f.mimeType, body: f.content });
+      if (url.searchParams.get('alt') === 'media' && f) { counts.down++; counts.downNames.push(f.name); } if (url.searchParams.get('alt') === 'media') return route.fulfill({ status: 200, contentType: f.mimeType, body: f.content });
       return json(route, 200, meta(f));
     }
     if ((m = /^\/drive\/v3\/files\/([^/]+)$/.exec(p)) && method === 'PATCH') {
@@ -102,6 +106,7 @@ export function createFakeGoogle({ email = 'tester@example.com' } = {}) {
     if (p === '/upload/drive/v3/files' && method === 'POST') {
       const { meta, content } = parseMultipart(req.postDataBuffer(), req.headers()['content-type']);
       const parent = (meta.parents || ['root'])[0];
+      counts.up++; counts.upNames.push(meta.name);
       const f = put(meta.name, parent === 'appDataFolder' ? 'appDataFolder' : parent, content, meta.mimeType || 'application/json');
       if (parent === 'appDataFolder') f.appData = true;
       if (meta.appProperties) f.appProperties = { ...meta.appProperties };
@@ -111,6 +116,7 @@ export function createFakeGoogle({ email = 'tester@example.com' } = {}) {
     if ((m = /^\/upload\/drive\/v3\/files\/([^/]+)$/.exec(p)) && method === 'PATCH') {
       const f = files.get(m[1]); if (!f || f.trashed) return json(route, 404, { error: { message: 'File not found' } });
       const { meta, content } = parseMultipart(req.postDataBuffer(), req.headers()['content-type']);
+      counts.up++; counts.upNames.push(f.name);
       f.content = content; if (meta.name) f.name = meta.name; if (meta.appProperties) f.appProperties = { ...(f.appProperties || {}), ...meta.appProperties }; touch(f);
       return json(route, 200, { id: f.id, modifiedTime: f.modifiedTime });
     }
@@ -139,8 +145,9 @@ export function createFakeGoogle({ email = 'tester@example.com' } = {}) {
 
   function gisStub(fail) {
     return `window.google = { accounts: { oauth2: {
-      initTokenClient(cfg) { return { callback: cfg.callback, error_callback: null, requestAccessToken(o) {
-        const self = this; setTimeout(() => ${fail ? "self.error_callback ? self.error_callback({ type: 'popup_failed_to_open' }) : self.callback({ error: 'interaction_required' })" : "self.callback({ access_token: 'tok-' + Math.random().toString(36).slice(2), expires_in: 3600 })"}, 20); } }; },
+      initTokenClient(cfg) { return { callback: cfg.callback, error_callback: cfg.error_callback, requestAccessToken(o) {
+        const self = this; window.__gisRequests = (window.__gisRequests || 0) + 1; if (window.__gisLost) { setTimeout(() => self.error_callback && self.error_callback({ type: 'popup_closed' }), 10); return; } if (window.__gisClosedFirst) { setTimeout(() => self.error_callback && self.error_callback({ type: 'popup_closed' }), 10); setTimeout(() => self.callback({ access_token: 'tok-late', expires_in: 3600 }), 300); return; }
+        setTimeout(() => ${fail ? "self.error_callback ? self.error_callback({ type: 'popup_failed_to_open' }) : self.callback({ error: 'interaction_required' })" : "self.callback({ access_token: 'tok-' + Math.random().toString(36).slice(2), expires_in: 3600 })"}, 20); } }; },
       revoke(t, cb) { cb && cb(); } } } };`;
   }
 
@@ -156,5 +163,5 @@ export function createFakeGoogle({ email = 'tester@example.com' } = {}) {
     for (const e of events) { const ev = { id: id('ev'), status: 'confirmed', ...e }; calendars.get('primary').events.set(ev.id, ev); }
   }
 
-  return { attach, seed, files, calendars, log, faults, tree, readJsonAt, path, put, touch, find };
+  return { attach, seed, files, calendars, log, faults, counts, tree, readJsonAt, path, put, touch, find };
 }

@@ -18,6 +18,7 @@ import * as AN from '../docs/js/anatomy.js';
 import * as CZ from '../docs/js/custom.js';
 import { mergeStates, sanitize } from '../docs/js/store.js';
 import { checkBackup } from '../docs/js/backup-check.js';
+import * as CP from '../docs/js/cloudparts.js';
 import { POLICY_TEXT } from './policy-sample.mjs';
 import { checker } from './helpers-node.mjs';
 import { shifts, state, calamansi } from './fixture.mjs';
@@ -124,5 +125,10 @@ const a = GA.saveShop(s0, { name: 'Phone workshop' }), b = GA.saveQuote(s0, { ca
 const m = mergeStates(a, b); check(Object.keys(m.workshops).length === 3 && Object.keys(m.quotes).length === 3, 'a workshop on one device and a quote on the other both survive');
 check(CZ.custom({ settings: { custom: { tabs: { hidden: ['dash', 'trip'] } } } }).tabs.hidden.join() === 'trip', 'Dash can never be hidden');
 
+console.log('the Drive layout (cloud model)');
+const spl = CP.split(s0);
+check(!spl.core.cars && !spl.core.workshops && spl.core.layout === 2 && Object.keys(spl.parts).length === CP.PARTS, 'split: a core without records + every part');
+const back = CP.join(spl.core, spl.parts); check(['cars', 'workshops', 'quotes', 'photos'].every(c => JSON.stringify(Object.keys(back[c]).sort()) === JSON.stringify(Object.keys(s0[c]).sort())), 'join(split(s)) gives every record back');
+check(Object.keys(CP.join(s0, {}).cars).length === 1, 'an old single state.json still reads');
 if (bad()) { console.log(`FAILED: ${bad()}`); process.exit(1); }
 console.log('all good');

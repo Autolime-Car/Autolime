@@ -1,13 +1,16 @@
-// Single source of truth for Autolime (the car app). Persists to localStorage immediately and to Google Drive (Citrus/Life/Car - Autolime/state.json, found by tag) when signed in.
+// Single source of truth for Autolime (the car app). Kept on the device in IndexedDB (two slots) and localStorage, and on Google Drive as a core + part files (cloudparts.js) in Citrus/Life/Car - Autolime, found by tag.
 // Three promises: a malformed record never reaches the views (sanitize on load, restore and merge), a merge of two devices
 // never drops an edit (every collection merges per record or per field, by edit time), and a damaged localStorage copy is
 // kept and recovered instead of silently replaced.
 import { uid } from './util.js';
+import { createDevStore, createTabChannel } from './devstore.js';
 
 const KEY = 'autolime.state.v1';
 const BAK = 'autolime.state.v1.bak';        // this device's last copy that loaded cleanly (written once per app start)
 const CORRUPT = 'autolime.state.corrupt.';  // + ISO time: a copy that could not be read, kept for download
 const TOMBSTONE_DAYS = 400;                 // a device can be offline this long and still not bring deleted things back
+const BIG = 'autolime.state.inIdb';         // set when the data is too big for localStorage and lives in IndexedDB only
+const LS_MAX = 1.2e6;                       // characters (≈2.4 MB as UTF-16): above this localStorage is not used for the state
 
 const DEFAULT_SETTINGS = { clientId: '753489712404-ra7ahu34gjl305b4ss1765idmqg7am5s.apps.googleusercontent.com', calendarIds: ['primary'], planCalendarId: 'primary', alarmPlan: 10, driveFolder: 'Citrus', theme: 'dark' };
 
@@ -166,18 +169,46 @@ export function salvageJSON(raw) {
 export const persistence = { ok: true, lastError: '', bytes: 0, since: 0 };
 const persistListeners = new Set();
 export function onPersistence(fn) { persistListeners.add(fn); return () => persistListeners.delete(fn); }
+// Two places on this device: IndexedDB (the durable copy, any size, two slots so a cut-off save never loses the last good one)
+// and, while the library is small, localStorage too (read at once on start-up, and the fallback where IndexedDB is missing).
+export const device = { idb: false, idbError: '', lastIdbSave: 0, slot: '', bytes: 0, tabs: 1 };
+const dev = createDevStore('autolime');
+const tabs = createTabChannel('autolime.state');
+let idbTimer = null, idbRaw = null, idbWriting = null;
+function idbQueue(raw) { if (!dev.ok) return; idbRaw = raw; clearTimeout(idbTimer); idbTimer = setTimeout(() => { flushDevice().catch(() => {}); }, 200); }
+/** Write the waiting copy to IndexedDB now (on leaving the page, before a risky step). */
+export async function flushDevice() {
+  clearTimeout(idbTimer); if (idbWriting) await idbWriting.catch(() => {});
+  if (idbRaw == null || !dev.ok) return;
+  const raw = idbRaw; idbRaw = null;
+  idbWriting = dev.write(raw, highestSeen(state)).then(slot => { device.idb = true; device.idbError = ''; device.lastIdbSave = Date.now(); device.slot = slot; device.bytes = raw.length * 2; tabs.post({ type: 'saved', hi: highestSeen(state) }); refreshOk(); })
+    .catch(e => { device.idb = false; device.idbError = e?.message || 'IndexedDB save failed'; refreshOk(); })
+    .finally(() => { idbWriting = null; });
+  return idbWriting;
+}
+let lsSaved = true;
+function refreshOk() {
+  const was = persistence.ok, ok = lsSaved || device.idb;
+  if (ok) { persistence.ok = true; persistence.lastError = ''; persistence.since = 0; } else { persistence.ok = false; persistence.since ||= Date.now(); }
+  if (was !== persistence.ok) { for (const fn of persistListeners) try { fn(persistence); } catch {} alerts(); }
+}
 function persist() {
   const raw = JSON.stringify(state);
   const was = persistence.ok;
   persistence.bytes = raw.length * 2;
   let saved = false;
-  for (let attempt = 0; attempt < 3 && !saved; attempt++) {
-    try { localStorage.setItem(KEY, raw); saved = true; }
+  const big = raw.length > LS_MAX && dev.ok && !device.idbError;
+  if (big) { lsDel(KEY); lsDel(BAK); lsSet(BIG, String(Date.now())); saved = true; }   // too big for localStorage: IndexedDB carries it (refreshOk corrects this if its save fails)
+  else for (let attempt = 0; attempt < 3 && !saved; attempt++) {
+    try { localStorage.setItem(KEY, raw); saved = true; lsDel(BIG); }
     catch (e) {
       persistence.lastError = e?.name === 'QuotaExceededError' || /quota/i.test(e?.message || '') ? 'This device\'s storage is full' : (e?.message || 'save failed');
       if (attempt === 0) lsDel('autolime.events'); else if (attempt === 1) lsDel(BAK); else console.warn('persist failed', e);
     }
   }
+  lsSaved = saved && !big;
+  idbQueue(raw);
+  if (!saved && device.idb) saved = true;   // IndexedDB holds it
   if (saved) { persistence.ok = true; persistence.lastError = ''; persistence.since = 0; }
   else { persistence.ok = false; persistence.since ||= Date.now(); }
   if (was !== persistence.ok) { for (const fn of persistListeners) try { fn(persistence); } catch {} alerts(); }
@@ -197,6 +228,7 @@ export function highestSeen(s) {
   if (!isObj(s)) return 0; if (seenCache.has(s)) return seenCache.get(s);
   let hi = num(s.updatedAt, 0);
   for (const coll of Object.keys(RECORD_MAPS)) for (const v of Object.values(s[coll] || {})) if (isObj(v)) hi = Math.max(hi, num(v.at, 0), num(v.at2, 0));
+  for (const k of CELL_MAPS) for (const cells of Object.values(s[k] || {})) if (isObj(cells)) for (const c of Object.values(cells)) if (isObj(c)) hi = Math.max(hi, num(c.at, 0));
   for (const t of Object.values(s.deleted || {})) hi = Math.max(hi, num(t, 0));
   for (const t of Object.values(s.stamps || {})) hi = Math.max(hi, num(t, 0));
   seenCache.set(s, hi); return hi;
@@ -234,6 +266,19 @@ function exactChanges(prev, next, t) {
       if (isObj(v)) b[k] = { ...v, at: t, ...(v.at2 ? { at2: t } : {}) };
     }
     next[coll] = b;
+  }
+  // habit ticks: a cell that changed gets the fresh time, a cell that went away becomes an explicit "not done"
+  for (const k of CELL_MAPS) {
+    const a = prev?.[k] || {}, b = { ...(next[k] || {}) };
+    for (const id of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const ca = a[id] || {}, cb = { ...(b[id] || {}) }; let ch = false;
+      for (const d of new Set([...Object.keys(ca), ...Object.keys(cb)])) {
+        if (!(d in cb)) { cb[d] = { v: 0, at: t }; ch = true; }
+        else if (!same(cb[d], ca[d])) { cb[d] = { ...cb[d], at: t }; ch = true; }
+      }
+      if (ch) b[id] = cb;
+    }
+    next[k] = b;
   }
   next.deleted = deleted;
 }
@@ -342,6 +387,16 @@ export function mergeStates(local, remote) {
     return m;
   };
   for (const [coll, prefix] of Object.entries(RECORD_MAPS)) out[coll] = mergeMap(prefix, older[coll], newer[coll]);
+  // habit ticks: cell by cell (one day of one habit), newest tap wins; a deleted habit takes its ticks with it
+  for (const k of CELL_MAPS) {
+    const a = older[k] || {}, b = newer[k] || {}, m = {};
+    for (const id of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const cells = { ...(a[id] || {}) };
+      for (const [d, c] of Object.entries(b[id] || {})) if (!cells[d] || num(c?.at, 0) >= num(cells[d]?.at, 0)) cells[d] = c;
+      m[id] = cells;
+    }
+    out[k] = m;
+  }
   // settings: field by field
   for (const [field, pre, dflt] of [['settings', 'set', DEFAULT_SETTINGS]]) {
     const a = older[field] || {}, b = newer[field] || {}, o = {};
@@ -370,6 +425,28 @@ function alerts() {
   if (typeof document === 'undefined') return;
   if (!recovery && persistence.ok && !document.querySelector('.d10-alert')) return;
   import('./store-alerts.js').then(m => m.showStoreAlerts({ recovery: () => recovery, persistence, corruptCopy, dismissRecovery, exportJSON })).catch(() => {});
+}
+/** Start-up, after the quick localStorage read: take in IndexedDB's copy if it holds anything newer (another tab, or a library
+ *  too big for localStorage), and listen for saves from other tabs. Awaited by app.js before the first screen. */
+export async function init() {
+  if (!dev.ok) return false;
+  try {
+    const best = await bestDeviceCopy();
+    device.idb = true;
+    if (best && highestSeen(best) > highestSeen(state)) {
+      state = complete(sanitize(lsGet(KEY) ? mergeStates(state, best) : best));
+      persist(); for (const fn of listeners) fn(state);
+    } else if (!best || highestSeen(state) > highestSeen(best)) { idbQueue(JSON.stringify(state)); await flushDevice(); }
+  } catch (e) { device.idb = false; device.idbError = e?.message || 'IndexedDB unavailable'; }
+  tabs.on(async (msg) => {
+    if (msg?.type !== 'saved' || !(msg.hi > highestSeen(state))) return;
+    try { const best = await bestDeviceCopy(); if (best && highestSeen(best) > highestSeen(state)) { state = complete(sanitize(mergeStates(state, best))); persist(); for (const fn of listeners) fn(state); } } catch {}
+  });
+  return true;
+}
+async function bestDeviceCopy() {
+  for (const s of await dev.slots()) { const p = parseState(s.raw); if (p) return sanitize(p); }
+  return null;
 }
 state = load();
 if (recovery) mergePending = true;

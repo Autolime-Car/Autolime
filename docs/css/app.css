@@ -393,6 +393,14 @@ ol.how { margin: 6px 0 12px; padding-left: 20px; display: grid; gap: 8px; } ol.h
 @keyframes pop { to { transform: translate(var(--dx), calc(var(--dy) + 120px)) rotate(var(--r)); opacity: 0; } }
 .d10-alert { position: fixed; z-index: 300; left: 12px; right: 12px; top: 70px; padding: 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--amber); box-shadow: var(--shadow); }
 
+/* ───── Your data (the cloud card) */
+.cloud .cd-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; } .cd-h { font-weight: 800; font-size: 1.1rem; }
+.cd-dot { width: 14px; height: 14px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; background: var(--dim); }
+.cloud.t-ok .cd-dot { background: var(--green); box-shadow: 0 0 10px var(--green); } .cloud.t-busy .cd-dot { background: var(--amber); animation: blink 1s infinite; } .cloud.t-warn .cd-dot { background: var(--amber); } .cloud.t-bad .cd-dot { background: var(--red); box-shadow: 0 0 10px var(--red); }
+.cd-rows { display: flex; flex-direction: column; gap: 6px; } .cd-row { display: grid; grid-template-columns: 20px auto 1fr; gap: 8px; align-items: baseline; } .cd-row b { font-size: .88rem; white-space: nowrap; }
+.cd-i { font-weight: 800; text-align: center; } .cd-row.ok .cd-i { color: var(--green); } .cd-row.bad .cd-i { color: var(--red); }
+@media (max-width: 420px) { .cd-row { grid-template-columns: 20px 1fr; } .cd-row .small { grid-column: 2; } }
+
 /* ════════════════════════════════════════ The signature (from Mandarin 1.2): four marks every app the owner directs carries, in orange.
    1 segment wheel: the logo, one segment in Autolime's lime; it turns while syncing. 2 corner fold on top-level cards.
    3 peel curl under every screen title. 4 pip: the seed that marks "now" (the active tab, now on the road, this month). */
