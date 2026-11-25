@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-ui="clean" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f0e">
+<meta name="color-scheme" content="dark light">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Autolime</title>
+<meta name="description" content="Autolime: your car, looked after. Care by km or date with the Arabic workshop words, quotes and workshops, papers and renewals, fuel and money, road trips and the accident card.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Manrope:wght@500;600;700;800&family=Noto+Kufi+Arabic:wght@500;700&family=Pixelify+Sans:wght@500;700&display=swap">
+<script>/* interface before first paint (per device) */try{var u=JSON.parse(localStorage.getItem("autolime.ui")||"{}")||{},st=JSON.parse(localStorage.getItem("autolime.state.v1")||"{}")||{},ui=u.ui||"clean",r=document.documentElement;r.dataset.ui=ui;r.dataset.size=u.size||"normal";var lk=((st.settings||{}).custom||{}).look||{};r.dataset.accent=lk.accent||"lime";r.dataset.density=lk.density||"comfy";r.dataset.motion=lk.motion===false?"off":"on";r.dataset.theme=ui==="paper"?"light":"dark";var m=document.querySelector("meta[name=theme-color]");if(m)m.content=ui==="paper"?"#f3f1e8":ui==="arcade"?"#12141f":"#0d0f0e";}catch(e){}</script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><circle class="rind" cx="16" cy="16" r="14.5"/><circle class="flesh" cx="16" cy="16" r="11.5"/><path class="seg" d="M16 16L25.96 21.75A11.5 11.5 0 0 1 16 27.5Z"/><g class="pith"><path d="M16 16V4.5M16 16L25.96 10.25M16 16L25.96 21.75M16 16V27.5M16 16L6.04 21.75M16 16L6.04 10.25"/></g><circle class="core" cx="16" cy="16" r="1.8"/></svg><span>Auto<b>lime</b></span></div>
+  <span class="page-title" id="pageTitle" aria-hidden="true"></span>
+  <span class="sync" id="syncDot" title="Google sync"></span>
+  <span class="tiny muted" id="syncText"></span>
+  <button class="btn icon ghost right" id="btnSOS" title="Accident card" aria-label="Accident card"><svg viewBox="0 0 24 24" fill="none" stroke="#ff5a4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg></button>
+  <button class="btn icon ghost" id="btnSearch" title="Search (/)" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+  <button class="btn icon ghost" id="btnRefresh" title="Sync (r)" aria-label="Sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg></button>
+  <button class="btn icon ghost" id="btnMore" title="Settings (,)" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1.1z"/></svg></button>
+</header>
+<main id="main">
+  <section class="view" id="view-dash"></section>
+  <section class="view" id="view-service"></section>
+  <section class="view" id="view-fuel"></section>
+  <section class="view" id="view-papers"></section>
+  <section class="view" id="view-trip"></section>
+  <section class="view" id="view-garage"></section>
+  <section class="view" id="view-more"></section>
+</main>
+<nav class="tabs" id="tabs" aria-label="Sections">
+  <button data-view="dash"><svg viewBox="0 0 24 24"><path d="M3.5 16.5a8.5 8.5 0 1 1 17 0"/><path d="M12 16.5 16 10"/><circle cx="12" cy="16.5" r="1.3"/></svg>Dash</button>
+  <button data-view="service"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.7 1.7 0 0 0 2.4 2.4l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.1-.4-.4-2.1z"/></svg>Service</button>
+  <button data-view="fuel"><svg viewBox="0 0 24 24"><path d="M4 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15"/><path d="M3 20h12"/><path d="M6.5 8h5"/><path d="M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8.5L18 5.5"/></svg>Fuel</button>
+  <button data-view="papers"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>Papers</button>
+  <button data-view="trip"><svg viewBox="0 0 24 24"><path d="M8 21 11 3M16 21 13 3"/><path d="M12 7v2M12 12v2M12 17v2"/></svg>Trip</button>
+  <button data-view="garage"><svg viewBox="0 0 24 24"><path d="M3 10 12 4l9 6v10H3z"/><path d="M7 20v-6h10v6"/><path d="M7 17h10"/></svg>Garage</button>
+  <button data-view="more" class="rail-only" title="Settings (,)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>Settings</button>
+</nav>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
