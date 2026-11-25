@@ -2,7 +2,7 @@
   "name": "autolime",
   "private": true,
   "type": "module",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Autolime — the car app of the citrus family: care by km or date with the Arabic workshop words, quotes and workshops, papers and renewals, fuel and money, road trips, engine codes and the accident card. A PWA with no build step.",
   "scripts": { "test": "bash test/all.sh", "bump": "sh scripts-bump.sh" }
 }

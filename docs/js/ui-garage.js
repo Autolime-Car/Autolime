@@ -17,7 +17,7 @@ export function renderGarage() {
   const s = S(), c = currentCar(s);
   return [viewHead('Garage'), carChips(s),
     h('div', { class: 'garage-tiles', role: 'tablist' }, PARTS.map(([id, ic, t, sub]) => h('button', { class: `gt ${part === id ? 'active' : ''}`, role: 'tab', 'aria-selected': String(part === id), onClick: () => { part = id; ctx.render(); } }, h('span', {}, ic), h('b', {}, t), h('small', {}, sub)))),
-    ...(part === 'codes' ? codesView(c) : part === 'noises' ? noisesView(c) : part === 'anatomy' ? anatomyView(c) : shopsView(s, c))];
+    ...(part === 'codes' ? codesView(c) : part === 'noises' ? noisesView(c) : part === 'anatomy' ? anatomyView(c) : [h('div', { class: 'wide pair' }, shopsView(s, c))])];
 }
 
 // ───────────────────────── workshops + quotes

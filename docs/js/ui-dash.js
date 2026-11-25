@@ -20,13 +20,12 @@ export function renderDash() {
       h('div', {},
         urgent.length ? h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('div', { class: 'title' }, `Due now · ${urgent.length}`), h('button', { class: 'btn sm', onClick: () => planSheet(c) }, c.plan ? '🗓 Plan' : '🗓 Plan them')), h('div', { class: 'rows' }, urgent.filter(x => !planned.has(x.id)).slice(0, 7).map(st => careRow(c, st))), urgent.some(x => planned.has(x.id)) ? h('div', { class: 'tiny dim', style: { marginTop: '6px' } }, `${urgent.filter(x => planned.has(x.id)).length} more are in your planned service.`) : null)
           : h('div', { class: 'card good' }, h('div', { class: 'small' }, unknown.length === items.length ? h('span', {}, h('b', {}, 'Start the countdowns. '), 'Say when each part was last done (Service), or tap one here.') : `✨ Nothing due. Next: ${known[0] ? `${known[0].def.label} ${CC.dueText(known[0], dmy)}` : '—'}`),
-            unknown.length === items.length ? h('div', { class: 'rows', style: { marginTop: '8px' } }, items.filter(x => ['oil', 'brakes', 'battery', 'tyres', 'atf'].includes(x.id)).map(st => careRow(c, st))) : null),
-        c.plan ? planCard(c, now) : null,
-        known.length ? h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('div', { class: 'title' }, 'Coming up'), h('button', { class: 'btn sm ghost', onClick: () => ctx.go('service') }, 'All parts →')), h('div', { class: 'rows' }, known.slice(0, 4).map(st => careRow(c, st)))) : null),
+            unknown.length === items.length ? h('div', { class: 'rows', style: { marginTop: '8px' } }, items.filter(x => ['oil', 'brakes', 'battery', 'tyres', 'atf'].includes(x.id)).map(st => careRow(c, st))) : null)),
+      h('div', {}, c.plan ? planCard(c, now) : null, tripTeaser(c, now), moneyCard(c, now), logbook(c)),
       h('div', {},
         paperTiles(c, now),
         renew.length ? h('button', { class: 'card cta warn', onClick: () => ctx.go('papers') }, h('span', { class: 'ic' }, renew[0].icon), h('span', { class: 'grow' }, h('b', {}, `Renew the ${renew[0].label.replace(/ \(.*\)$/, '').toLowerCase()}`), h('span', { class: 'tiny dim' }, ` · ${renew[0].days < 0 ? `expired ${-renew[0].days} d ago` : `${renew[0].days} d left`} · ${renew[0].done}/${renew[0].total} steps`)), h('span', { class: 'arrow' }, '→')) : null,
-        tripTeaser(c, now), moneyCard(c, now),
+        known.length ? h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('div', { class: 'title' }, 'Coming up'), h('button', { class: 'btn sm ghost', onClick: () => ctx.go('service') }, 'All parts →')), h('div', { class: 'rows' }, known.slice(0, 4).map(st => careRow(c, st)))) : null,
         c.model === 'camry-2016' && !urgent.length && known.length > 8 ? h('button', { class: 'card cta', onClick: () => ctx.go('garage', 'noises') }, h('span', { class: 'ic' }, '👂'), h('span', { class: 'grow' }, h('b', {}, 'A new noise?'), h('span', { class: 'tiny dim' }, ' · the guided checks tell you what it probably is')), h('span', { class: 'arrow' }, '→')) : null)),
   ];
 }
@@ -78,6 +77,15 @@ export function planCard(c, now) {
     p.note ? h('div', { class: 'small', style: { margin: '0 0 8px' } }, p.note) : null,
     h('div', { class: 'chips' }, p.items.slice(0, 12).map(id => h('button', { class: 'chip', onClick: () => itemSheet(c, id) }, `${CC.ITEMS[id].icon} ${CC.ITEMS[id].label}`, added.has(id) ? tag('sug', 'suggested') : null)), p.items.length > 12 ? h('span', { class: 'chip static' }, `+${p.items.length - 12}`) : null),
     h('div', { class: 'row wrap', style: { marginTop: '10px' } }, h('button', { class: 'btn primary', onClick: () => workshopSheet(c) }, '🧾 Show the workshop'), h('button', { class: 'btn', onClick: () => visitSheet(c, p.items) }, '✓ Done — log it'), h('button', { class: 'btn ghost', onClick: () => ctx.quoteSheet(c, null, p.items) }, '💬 Quote')));
+}
+/** The latest things that happened to the car, newest first: services, fill-ups, odometer readings, photos. */
+function logbook(c) {
+  const s = S(), ev = [];
+  for (const v of c.log || []) ev.push({ d: v.date, ic: '🔧', t: (v.items || []).map(i => CC.ITEMS[i]?.label).filter(Boolean).slice(0, 3).join(', ') || 'Service', sub: [v.cost ? sar(v.cost) : '', s.workshops?.[v.shop]?.name || v.place].filter(Boolean).join(' · ') });
+  for (const f of c.fuel || []) ev.push({ d: f.date, ic: '⛽', t: `${f.litres} L${f.full ? '' : ' (part)'}`, sub: [f.cost ? sar(f.cost) : '', f.km ? kmT(f.km) : ''].filter(Boolean).join(' · ') });
+  for (const p of Object.values(s.photos || {}).filter(p => p.car === c.id)) ev.push({ d: p.date, ic: '📷', t: p.note || p.kind, sub: p.file ? 'on Drive' : 'on this phone' });
+  const list = ev.sort((a, b) => b.d.localeCompare(a.d)).slice(0, 6); if (!list.length) return null;
+  return h('div', { class: 'card' }, h('div', { class: 'title' }, 'Logbook'), h('div', { class: 'fills' }, list.map(e => h('div', { class: 'fill' }, h('span', { class: 'n' }, dmy(e.d)), h('span', { class: 'small' }, `${e.ic} ${e.t}`, e.sub ? h('span', { class: 'tiny dim' }, ` · ${e.sub}`) : null), h('span')))));
 }
 function tripTeaser(c, now) {
   const t = c.trip; if (!t || t.closed) return h('button', { class: 'card cta', onClick: () => ctx.go('trip') }, h('span', { class: 'ic' }, '🛣️'), h('span', { class: 'grow' }, h('b', {}, 'Road trip?'), h('span', { class: 'tiny dim' }, ' · legs, fuel, what falls due on the way, the checks')), h('span', { class: 'arrow' }, '→'));

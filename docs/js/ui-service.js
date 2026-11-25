@@ -18,11 +18,11 @@ export function renderService() {
   const show = (st) => filter === 'all' || (filter === 'due' ? st.state === 'late' || st.state === 'soon' : filter === 'unknown' ? st.state === 'unknown' : true);
   const sticker = PH.photoList(s, { car: c.id, kind: 'sticker' })[0];
   return [viewHead('Service', h('button', { class: 'btn primary', onClick: () => visitSheet(c) }, '🔧 Log a service')), carChips(s),
-    h('div', { class: 'card' }, h('div', { class: 'stats' }, stat(hp.pct === null ? `${hp.tracked}/${hp.total}` : `${hp.pct}%`, hp.pct === null ? 'parts known' : 'health', 'acc'), stat(String(counts.late), 'overdue'), stat(String(counts.soon), 'due soon'), stat(String(counts.unknown), 'not set up')),
+    h('div', { class: 'wide pair' }, h('div', { class: 'card' }, h('div', { class: 'stats' }, stat(hp.pct === null ? `${hp.tracked}/${hp.total}` : `${hp.pct}%`, hp.pct === null ? 'parts known' : 'health', 'acc'), stat(String(counts.late), 'overdue'), stat(String(counts.soon), 'due soon'), stat(String(counts.unknown), 'not set up')),
       h('div', { class: 'row wrap', style: { marginTop: '10px' } }, h('button', { class: 'btn', onClick: () => planSheet(c) }, c.plan ? '🗓 Edit the plan' : '🗓 Plan a service'), h('button', { class: 'btn', onClick: () => workshopSheet(c) }, '🧾 Workshop list'), h('button', { class: 'btn', onClick: () => ctx.takePhoto({ kind: 'sticker', car: c.id, note: 'Windscreen service sticker' }) }, '🏷️ Photo of the sticker'),
         h('button', { class: `chip ${c.severe !== false ? 'sel' : ''}`, 'aria-pressed': String(c.severe !== false), title: 'Toyota’s severe-use plan: heat, dust, city traffic', onClick: () => { putCar({ ...c, severe: c.severe === false }); ctx.render(); } }, c.severe !== false ? '🔥 Hot & dusty plan' : 'Normal plan')),
       sticker ? h('div', { class: 'row', style: { marginTop: '10px' } }, h('div', { style: { width: '96px' } }, thumb(sticker)), h('div', { class: 'tiny dim grow' }, `Last sticker photo ${dmy(sticker.date)}. Compare its next-change km with the plan below.`)) : null),
-    c.plan ? planCard(c, now) : null,
+    c.plan ? planCard(c, now) : null),
     h('div', { class: 'seg', role: 'tablist', style: { marginBottom: '10px' } }, [['all', 'All parts'], ['due', `Due (${counts.late + counts.soon})`], ['unknown', `Not set up (${counts.unknown})`]].map(([id, l]) => h('button', { class: filter === id ? 'active' : '', role: 'tab', 'aria-selected': String(filter === id), onClick: () => { filter = id; ctx.render(); } }, l))),
     ...CC.GROUPS.map(([name, icon, ids]) => { const rows = ids.filter(id => by[id] && show(by[id])).map(id => by[id]); if (!rows.length) return null;
       const late = rows.filter(x => x.state === 'late').length;

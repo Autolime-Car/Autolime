@@ -27,7 +27,7 @@ import { renderGarage, garagePart, quoteSheet, partSheet } from './ui-garage.js'
 import { checkBackup, describeCounts } from './backup-check.js';
 import { h, toast, keyOf, addDays, startOfDay, fromKey, fmtDate, DAY_NAMES, MONTHS, uid } from './util.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 const CITRUS_URL = 'https://amaerys.github.io/citrus-maxima/';
 const CALAMANSI_URL = 'https://calamansi-food.github.io/Calamansi/';
 
