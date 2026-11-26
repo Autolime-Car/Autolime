@@ -40,7 +40,7 @@ export function renderTrip() {
     pastTrips(c), EXU.toolsHint('trip')];
 }
 function startCard(c) {
-  return h('div', { class: 'card' }, h('div', { class: 'title' }, 'Plan a road trip'), h('div', { class: 'small muted', style: { marginBottom: '10px' } }, 'Pick a ready route or build your own. Autolime adds up the km and hours, the fuel and its cost, what falls due on the way and the checks.'),
+  return h('div', { class: 'card' }, h('div', { class: 'title' }, 'Plan a road trip'), h('div', { class: 'small muted', style: { marginBottom: '10px' } }, 'Pick a ready route or build your own. Vehicular adds up the km and hours, the fuel and its cost, what falls due on the way and the checks.'),
     h('div', { class: 'rows' }, TR.ROUTES.map(r => { const legs = TR.legsOf(r.stops), tot = legs.reduce((a, l) => ({ km: a.km + l.km, hrs: a.hrs + l.hrs }), { km: 0, hrs: 0 });
       return h('button', { class: 'item', onClick: () => tripSheet(c, { name: r.name, date: '', km: 0, price: 0, checks: [], legs, log: [], daily: {} }) }, h('span', { class: 'ii' }, '🗺️'), h('span', { class: 'im' }, h('span', { class: 'in' }, r.name), h('span', { class: 'id' }, r.stops.map(TR.cityName).join(' → '))), h('span', { class: 'val' }, kmT(tot.km))); }),
       h('button', { class: 'item', onClick: () => tripSheet(c, null) }, h('span', { class: 'ii' }, '✏️'), h('span', { class: 'im' }, h('span', { class: 'in' }, 'My own route'), h('span', { class: 'id' }, 'Add the stops one by one')))));

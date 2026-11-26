@@ -1,5 +1,5 @@
-// Autolime service worker: precached app shell, network-first with a short timeout, Google Fonts cached for offline.
-const CACHE = 'autolime-26d4c426cf';
+// Vehicular service worker: precached app shell, network-first with a short timeout, Google Fonts cached for offline.
+const CACHE = 'autolime-5136760457';
 const FONTS = 'autolime-fonts-v1';   // kept across releases: font files are immutable, no need to fetch them again
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Manrope:wght@500;600;700;800&family=Noto+Kufi+Arabic:wght@500;700&family=Pixelify+Sans:wght@500;700&display=swap';
 // Without these the app cannot start offline: install fails (and the old worker stays) if one is missing.

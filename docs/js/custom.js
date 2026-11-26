@@ -1,8 +1,8 @@
-// Your choices for how Autolime looks and behaves — synced with your state (settings.custom), unlike the per-device interface.
+// Your choices for how Vehicular looks and behaves — synced with your state (settings.custom), unlike the per-device interface.
 // Pure: defaults, sanitising and small getters. Settings › Customise edits it.
 import { TOOL, toolsOn } from './extras.js';
 export const TABS = [['dash', 'Dash'], ['service', 'Service'], ['fuel', 'Fuel'], ['papers', 'Papers'], ['trip', 'Trip'], ['garage', 'Garage']];
-export const ACCENTS = [['oil', 'Oil gold', '#f5b931'], ['honey', 'Fresh oil', '#ffd36b'], ['copper', 'Copper', '#e8864a'], ['cyan', 'Gauge cyan', '#3ad6f2'], ['red', 'Racing red', '#ff4b3e']];
+export const ACCENTS = [['oil', 'Oil gold', '#f5b931'], ['honey', 'Fresh oil', '#ffd36b'], ['gunmetal', 'Gunmetal', '#b9c3cc'], ['cyan', 'Gauge cyan', '#3ad6f2'], ['red', 'Racing red', '#ff4b3e']];
 export const DEFAULTS = {
   start: 'dash',
   tabs: { hidden: [], order: TABS.map(t => t[0]) },

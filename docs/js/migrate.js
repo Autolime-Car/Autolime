@@ -1,11 +1,11 @@
-// Bringing the car over from Calamansi (where the Car tab lived until Autolime, 16–25/11/2026): its cars and the driver
+// Bringing the car over from Calamansi (where the Car tab lived until Vehicular, 16–25/11/2026): its cars and the driver
 // (settings.driver), read once from Calamansi's state.json (tag calamansi) or a Calamansi backup file. Nothing is deleted in
 // Calamansi. Pure (no DOM).
 import { sanitize } from './store.js';
 import * as L from './car.js';
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
-/** What a Calamansi state holds for Autolime. */
+/** What a Calamansi state holds for Vehicular. */
 export function carPart(cal) {
   const cars = isObj(cal?.cars) ? Object.values(cal.cars).filter(c => isObj(c) && typeof c.name === 'string' && c.name.trim()) : [];
   const driver = isObj(cal?.settings?.driver) ? L.cleanDriver(cal.settings.driver) : null;
@@ -13,8 +13,8 @@ export function carPart(cal) {
   return { cars, driver: hasDriver ? driver : null, counts: { cars: cars.length, driver: hasDriver ? 1 : 0, visits: cars.reduce((t, c) => t + (c.log?.length || 0), 0), fills: cars.reduce((t, c) => t + (c.fuel?.length || 0), 0) } };
 }
 /**
- * Merge Calamansi's cars into Autolime: a car already here (same VIN, or the same name when there is no VIN) keeps whichever
- * copy was edited last; anything new comes in. The driver comes in field by field where Autolime has nothing yet.
+ * Merge Calamansi's cars into Vehicular: a car already here (same VIN, or the same name when there is no VIN) keeps whichever
+ * copy was edited last; anything new comes in. The driver comes in field by field where Vehicular has nothing yet.
  */
 export function applyMigration(local, cal, { now = Date.now() } = {}) {
   const { cars, driver, counts } = carPart(cal);
@@ -37,5 +37,5 @@ export function describe(c) {
   if (c?.driver) p.push('your licence');
   return p.join(', ') || 'nothing';
 }
-/** A Calamansi backup or state (not an Autolime one). */
+/** A Calamansi backup or state (not an Vehicular one). */
 export const looksLikeCalamansi = (j) => isObj(j) && (j.app === 'calamansi' || (!j.app && ('recipes' in j || 'chores' in j) && 'cars' in j));

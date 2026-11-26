@@ -14,9 +14,9 @@ const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
  * ok is false (and state null) only when nothing usable is in it; otherwise bad records are dropped and listed.
  */
 export function checkBackup(json) {
-  if (!isObj(json)) return { ok: false, error: 'This is not an Autolime backup (no data in it).', state: null, dropped: [], summary: null };
-  if (json.app && json.app !== 'autolime') return { ok: false, error: `This is a backup of ${String(json.app).slice(0, 20)}, not Autolime. To bring your car over from Calamansi, use Settings › Bring my car over from Calamansi.`, state: null, dropped: [], summary: null };
-  if (!MAPS.slice(0, 4).some(k => isObj(json[k]))) return { ok: false, error: 'This is not an Autolime backup: it has no cars or workshops.', state: null, dropped: [], summary: null };
+  if (!isObj(json)) return { ok: false, error: 'This is not an Vehicular backup (no data in it).', state: null, dropped: [], summary: null };
+  if (json.app && json.app !== 'autolime') return { ok: false, error: `This is a backup of ${String(json.app).slice(0, 20)}, not Vehicular. To bring your car over from Calamansi, use Settings › Bring my car over from Calamansi.`, state: null, dropped: [], summary: null };
+  if (!MAPS.slice(0, 4).some(k => isObj(json[k]))) return { ok: false, error: 'This is not an Vehicular backup: it has no cars or workshops.', state: null, dropped: [], summary: null };
   const s = JSON.parse(JSON.stringify(json)), dropped = [];
   for (const k of MAPS) {
     if (!(k in s)) continue;
@@ -26,9 +26,9 @@ export function checkBackup(json) {
     if (bad) dropped.push(`${bad} unreadable ${k} entr${bad > 1 ? 'ies' : 'y'}`);
   }
   if ('outbox' in s && !Array.isArray(s.outbox)) delete s.outbox;
-  // only what Autolime owns comes in: recipes, chores and the rest stay with their own app
+  // only what Vehicular owns comes in: recipes, chores and the rest stay with their own app
   const foreign = Object.keys(s).filter(k => !OWN.has(k)); for (const k of foreign) delete s[k];
-  if (foreign.length) dropped.push(`not Autolime's: ${foreign.slice(0, 6).join(', ')}${foreign.length > 6 ? '…' : ''}`);
+  if (foreign.length) dropped.push(`not Vehicular's: ${foreign.slice(0, 6).join(', ')}${foreign.length > 6 ? '…' : ''}`);
   for (const k of ['settings', 'google']) if (k in s && !isObj(s[k])) { delete s[k]; dropped.push(`${k} (unreadable)`); }
   const n = (k) => isObj(s[k]) ? Object.keys(s[k]).length : 0;
   const counts = { cars: n('cars'), workshops: n('workshops'), quotes: n('quotes'), photos: n('photos') };

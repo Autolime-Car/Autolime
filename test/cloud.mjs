@@ -14,7 +14,7 @@ function world() {
   const man = g.path(['Citrus', 'Work', 'Mandarin']); g.files.get(man).appProperties = { citrusApp: 'mandarin' }; g.put('shifts.json', man, shifts);
   return g;
 }
-const g = world(), ME = ['Citrus', 'Life', 'Car - Autolime'];
+const g = world(), ME = ['Citrus', 'Life', 'Car - Vehicular'];
 const part = (i) => `records-${i}.json`;
 const COLLS = ['cars', 'workshops', 'quotes', 'photos'];
 const driveState = (gg = g) => { const core = gg.readJsonAt(ME, 'state.json'); if (!core) return null; const out = { ...core }; for (const c of COLLS) { out[c] = { ...(core[c] || {}) }; for (let i = 0; i < PARTS; i++) Object.assign(out[c], gg.readJsonAt(ME, part(i))?.[c] || {}); } return out; };

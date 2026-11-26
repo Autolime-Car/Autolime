@@ -1,4 +1,4 @@
-// Single source of truth for Autolime (the car app). Kept on the device in IndexedDB (two slots) and localStorage, and on Google Drive as a core + part files (cloudparts.js) in Citrus/Life/Car - Autolime, found by tag.
+// Single source of truth for Vehicular (the car app). Kept on the device in IndexedDB (two slots) and localStorage, and on Google Drive as a core + part files (cloudparts.js) in Citrus/Life/Car - Vehicular, found by tag.
 // Three promises: a malformed record never reaches the views (sanitize on load, restore and merge), a merge of two devices
 // never drops an edit (every collection merges per record or per field, by edit time), and a damaged localStorage copy is
 // kept and recovered instead of silently replaced.

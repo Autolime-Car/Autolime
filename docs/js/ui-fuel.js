@@ -15,7 +15,7 @@ export function renderFuel() {
   const lastPrice = (c.fuel || []).filter(f => f.cost && f.litres).slice(-1)[0];
   return [viewHead('Fuel & money', h('button', { class: 'btn primary', onClick: () => fuelSheet(c) }, '⛽ Fill-up')), carChips(s),
     h('div', { class: 'card' }, h('div', { class: 'stats' }, stat(cost.l100 ? `${cost.l100}` : '—', 'L / 100 km (last 3 tanks)', 'acc'), stat(cost.perKm ? cost.perKm.toFixed(2) : '—', 'SAR fuel per km'), stat(lastPrice ? (lastPrice.cost / lastPrice.litres).toFixed(2) : '—', 'SAR a litre, last'), stat(sm.month.toLocaleString('en'), 'SAR this month')),
-      !eco.length ? h('div', { class: 'tiny dim', style: { marginTop: '8px' } }, 'Fill to full and type the odometer each time: from the second full tank Autolime shows your real consumption.') : null),
+      !eco.length ? h('div', { class: 'tiny dim', style: { marginTop: '8px' } }, 'Fill to full and type the odometer each time: from the second full tank Vehicular shows your real consumption.') : null),
     h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('div', { class: 'title' }, 'Month by month'), h('span', { class: 'tiny dim' }, `${sar(sm.year)} in ${now.getFullYear()}`)), monthChart(months),
       h('div', { class: 'legend' }, h('span', {}, h('i', { style: { background: 'var(--acc)' } }), 'Fuel'), h('span', {}, h('i', { style: { background: 'var(--cyan)' } }), 'Servicing'), h('span', {}, h('i', { style: { background: 'var(--amber)' } }), 'Trips (food, stays…)'))),
     h('div', { class: 'card' }, h('div', { class: 'title' }, 'What a km really costs'),

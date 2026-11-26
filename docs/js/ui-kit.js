@@ -1,4 +1,4 @@
-// Shared pieces of the Autolime screens: the selected car, small builders (rows, stats, tags, the plate, the gauges, the
+// Shared pieces of the Vehicular screens: the selected car, small builders (rows, stats, tags, the plate, the gauges, the
 // odometer roller, the telltales) and the ctx every screen gets from app.js.
 import { h, toast, keyOf, fromKey, fmtDate } from './util.js';
 import * as L from './car.js';

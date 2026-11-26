@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Autolime",
-  "short_name": "Autolime",
+  "name": "Vehicular",
+  "short_name": "Vehicular",
   "description": "Your car, looked after: care by km or date with the Arabic workshop words, quotes and workshops, papers and renewals, fuel and money, road trips, engine codes and the accident card. The car app of the citrus family.",
   "start_url": "./index.html",
   "scope": "./",

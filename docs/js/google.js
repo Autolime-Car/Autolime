@@ -1,21 +1,21 @@
-// Google for Autolime: sign-in (Google Identity Services token client), Calendar and Drive.
+// Google for Vehicular: sign-in (Google Identity Services token client), Calendar and Drive.
 // One Cloud project / web client for all the apps (Yuzu, Mephisto, Orange, Sinus…), no backend, no secret.
 //
 // Sign-in: the first connect shows Google's consent window. Afterwards a renewal (`prompt: ''`) goes through without a
 // screen, but phones only let Google's window open inside a tap — so renewals happen on the next tap anywhere in the
 // app (see renewOnTap), never from a timer. The one-hour token lives in localStorage on this device only.
 //
-// Drive layout (claude/drive-layout.md, claude/cloud-model.md): Autolime's folder is found by tag (citrusApp = autolime), made
-// once inside the area tagged citrusArea = life as "Car - Autolime". Inside it: state.json (the core) + records-0…7.json (the
+// Drive layout (claude/drive-layout.md, claude/cloud-model.md): Vehicular's folder is found by tag (citrusApp = autolime), made
+// once inside the area tagged citrusArea = life as "Car - Vehicular". Inside it: state.json (the core) + records-0…7.json (the
 // parts, cloudparts.js) · status.json · backups/ · setup.json (proposals, applied only on a tap) · photos/<kind>/.
-// Autolime only READS other apps' files (mandarin/shifts.json for days off, calamansi/state.json once for the migration);
+// Vehicular only READS other apps' files (mandarin/shifts.json for days off, calamansi/state.json once for the migration);
 // it never writes into another app's folder.
 //
 // What keeps it fast and solid:
 //  - folder ids cached by path and verified once per app session (one request for the deepest folder vouches for the path)
 //  - one in-flight lookup per path (parallel steps never create twin folders); writes to one file are queued
 //  - the Drive changes feed answers "anything new?" in one request; only what changed is read again
-//  - every file Autolime writes carries a content fingerprint (appProperties.h): identical content is never re-uploaded,
+//  - every file Vehicular writes carries a content fingerprint (appProperties.h): identical content is never re-uploaded,
 //    and other devices can tell what changed from the changes feed without downloading
 //  - state.json is written only after checking nobody else wrote it since we read it (else: pull, merge, write)
 //  - duplicates (a create whose answer was lost) are healed: newest wins, the rest go to the trash
@@ -193,7 +193,7 @@ const SAFE = /^(GET|HEAD|PATCH|PUT|DELETE)$/i;
 /** Authenticated fetch: retries what can be retried, plain-word errors, a 401 asks for a tap. `raw` returns bytes. */
 async function gfetch(url, opts = {}) {
   if (!isSignedIn()) { if (wasSignedIn()) auth.needsSignIn = true; throw new GoogleError(wasSignedIn() ? 'Google needs a tap to reconnect.' : 'Not signed in to Google.', { status: 401, auth: true }); }
-  if (navigator.onLine === false) throw new GoogleError('You\'re offline — nothing is lost; Autolime syncs when you\'re back.', { network: true, retryable: true });
+  if (navigator.onLine === false) throw new GoogleError('You\'re offline — nothing is lost; Vehicular syncs when you\'re back.', { network: true, retryable: true });
   const method = opts.method || 'GET';
   let res, msg = '';
   for (let attempt = 0; ; attempt++) {
@@ -206,7 +206,7 @@ async function gfetch(url, opts = {}) {
       clearTimeout(timer); if (e?.name === 'AbortError') stats.timeouts = (stats.timeouts || 0) + 1;
       // a dropped connection: repeat requests that are safe to send twice, for ~25 s
       if ((SAFE.test(method) || opts.retrySafe) && attempt < 5) { stats.retries++; await backoff(attempt); continue; }
-      fail(e?.name === 'AbortError' ? 'Timed out' : 'Network error'); throw new GoogleError(e?.name === 'AbortError' ? 'Google took too long to answer — Autolime tries again shortly.' : 'Google couldn\'t be reached — the connection dropped.', { network: true, retryable: true });
+      fail(e?.name === 'AbortError' ? 'Timed out' : 'Network error'); throw new GoogleError(e?.name === 'AbortError' ? 'Google took too long to answer — Vehicular tries again shortly.' : 'Google couldn\'t be reached — the connection dropped.', { network: true, retryable: true });
     }
     clearTimeout(timer);
     msg = '';
@@ -224,7 +224,7 @@ async function gfetch(url, opts = {}) {
   if (!msg) { try { msg = (await res.clone().json())?.error?.message || ''; } catch {} }
   if (res.status === 401 || (res.status === 403 && /insufficient|scope/i.test(msg))) { expireToken(); fail('Sign-in expired'); throw new GoogleError('Google needs a tap to reconnect.', { status: res.status, auth: true }); }
   fail(`${res.status} ${msg.trim() || res.statusText}`);
-  throw new GoogleError(res.status === 404 ? 'Not found on Drive.' : res.status >= 500 || res.status === 429 ? `Google is busy (${res.status}) — Autolime tries again later.` : `Google ${res.status}: ${msg.trim() || res.statusText}`, { status: res.status, retryable: res.status >= 500 || res.status === 429 });
+  throw new GoogleError(res.status === 404 ? 'Not found on Drive.' : res.status >= 500 || res.status === 429 ? `Google is busy (${res.status}) — Vehicular tries again later.` : `Google ${res.status}: ${msg.trim() || res.statusText}`, { status: res.status, retryable: res.status >= 500 || res.status === 429 });
 }
 function fail(m) { stats.errors++; stats.lastError = m; stats.lastErrorAt = Date.now(); }
 
@@ -256,13 +256,13 @@ export async function createEvent(calendarId, { title, start, end, description =
   const day = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const body = { summary: title, description, location, start: allDay ? { date: day(start) } : { dateTime: start.toISOString() }, end: allDay ? { date: day(end) } : { dateTime: end.toISOString() }, extendedProperties: { private: { autolime: tag || 'event', ...(key ? { key } : {}) } } };
   if (colorId) body.colorId = colorId;
-  // alarms: minutes before the start, as pop-ups (your phone's Calendar app rings them even when Autolime is closed)
+  // alarms: minutes before the start, as pop-ups (your phone's Calendar app rings them even when Vehicular is closed)
   if (Array.isArray(reminders)) body.reminders = { useDefault: false, overrides: reminders.slice(0, 5).map(m => ({ method: 'popup', minutes: Math.max(0, Math.min(40320, +m || 0)) })) };
   if (Array.isArray(recurrence) && recurrence.length) { const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; body.recurrence = recurrence; body.start = { dateTime: start.toISOString(), timeZone: tz }; body.end = { dateTime: end.toISOString(), timeZone: tz }; }
   const j = await gfetch(`${CAL}/calendars/${encodeURIComponent(calendarId)}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return normalizeEvent(j, calendarId);
 }
-/** Find an event Autolime created earlier by its key (so a create whose answer was lost isn't made twice). */
+/** Find an event Vehicular created earlier by its key (so a create whose answer was lost isn't made twice). */
 export async function findEventByKey(calendarId, key, from, to) {
   const q = new URLSearchParams({ privateExtendedProperty: `key=${key}`, timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: 'true', maxResults: '5' });
   const j = await gfetch(`${CAL}/calendars/${encodeURIComponent(calendarId)}/events?${q}`);
@@ -287,7 +287,7 @@ export async function ensureCalendar(name) {
   const j = await gfetch(`${CAL}/calendars`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: name, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }) });
   return j.id;
 }
-/** Make the Autolime-tagged events in a range match `wanted` (creates the missing, deletes the extra, leaves the rest). */
+/** Make the Vehicular-tagged events in a range match `wanted` (creates the missing, deletes the extra, leaves the rest). */
 export async function syncTaggedEvents(calendarId, tag, from, to, wanted) {
   const existing = (await listEvents(calendarId, from, to)).filter(e => e.tag === tag);
   const key = (e) => `${e.title}|${e.start.toISOString()}|${e.end.toISOString()}`;
@@ -448,7 +448,7 @@ export async function changesSince(tokenStr, maxPages = 20) {
 
 // ════════════════════════════════════════ the hub
 // Folders are found by their tag, never by path (claude/drive-layout.md): every app folder carries appProperties.citrusApp =
-// "<id>", so Citrus can move and rename it and Autolime still finds it. Autolime never renames or moves a folder.
+// "<id>", so Citrus can move and rename it and Vehicular still finds it. Vehicular never renames or moves a folder.
 export const APP = 'autolime';
 export const TAG = 'citrusApp';
 const tagCache = {};   // app → folder id (or null), checked once per app session
@@ -470,14 +470,14 @@ export function findTagged(app) {
   tagInflight.set(app, p); return p;
 }
 async function tagFolder(id, app) { await gfetch(`${DRIVE}/files/${encodeURIComponent(id)}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appProperties: { [TAG]: app } }) }); ids[`tag:${app}`] = id; persistIds(); tagCache[app] = id; }
-export const AREA = 'life', FOLDER_NAME = 'Car - Autolime';
+export const AREA = 'life', FOLDER_NAME = 'Car - Vehicular';
 /** An area folder (citrusArea = life): where a new app folder is made. */
 async function areaFolder(root) {
   const qs = new URLSearchParams({ q: `mimeType = '${FOLDER}' and trashed = false and appProperties has { key='citrusArea' and value='${q(AREA)}' }`, fields: 'files(id,createdTime)', spaces: 'drive', pageSize: '10' });
   const j = await gfetch(`${DRIVE}/files?${qs}`), pick = (j.files || []).sort((a, b) => (a.createdTime || '').localeCompare(b.createdTime || ''))[0];
   return pick ? pick.id : ensurePath([root || 'Citrus', 'Life']);   // Citrus tags and merges a by-name area on its next organise run
 }
-/** A folder by tag. own: Autolime's folder, made once inside the Life area (never by an old path) and tagged at once.
+/** A folder by tag. own: Vehicular's folder, made once inside the Life area (never by an old path) and tagged at once.
  *  Another app's folder is only ever read where its tag says. */
 export async function folderOf(root, app, { own = false } = {}) {
   const t = await findTagged(app); if (t) return t;
@@ -501,16 +501,16 @@ async function childFolder(parentId, name, create = true) {
   return id;
 }
 const backupsDir = async (root, create = true) => { const me = await meDir(root); return childFolder(me, 'backups', create); };
-/** Whether Autolime found its own folder by tag this session (for status.json › drive). */
+/** Whether Vehicular found its own folder by tag this session (for status.json › drive). */
 export const ownTagged = () => !!tagCache[APP];
 
-/** Folder ids Autolime watches in the changes feed: its own folder, and the folders of the apps it reads (Mandarin, Citrus). */
+/** Folder ids Vehicular watches in the changes feed: its own folder, and the folders of the apps it reads (Mandarin, Citrus). */
 export async function watchedFolders(root) {
   const [me, mandarin, citrus] = await Promise.all([meDir(root), folderOf(root, 'mandarin'), folderOf(root, 'citrus')]);
   return { me, mandarin: mandarin || '', citrus: citrus || '' };
 }
 
-/** Autolime's small public file in its own folder: status.json (what Citrus shows). */
+/** Vehicular's small public file in its own folder: status.json (what Citrus shows). */
 export async function writeOwnFile(root, name, obj, { omit = ['updatedAt'] } = {}) { const dir = await meDir(root); return putJson(dir, name, obj, { omit, healTwins: true }); }
 
 /** Another app's JSON file, read only, from its tagged folder. null when it is not there. Twins are left alone (not ours to tidy). */
@@ -521,7 +521,7 @@ export async function readOtherFile(root, app, name) {
   return data && typeof data === 'object' ? { data, modifiedTime: file.modifiedTime, id: file.id } : null;
 }
 
-/** A setup file left in Autolime's own folder (setup.json, e.g. by Claude): {data, id}, or null. Never applied here: the app proposes it. */
+/** A setup file left in Vehicular's own folder (setup.json, e.g. by Claude): {data, id}, or null. Never applied here: the app proposes it. */
 export async function readSetupFile(root) {
   const dir = await findTagged(APP); if (!dir) return null;
   const { file } = await findFile(dir, 'setup.json'); if (!file) return null;
@@ -531,7 +531,7 @@ export async function readSetupFile(root) {
 /** After "Add it": the setup file goes to the bin (Drive keeps it 30 days). */
 export async function binSetupFile(id) { await trash(id); }
 
-// ── Autolime's own state on Drive: a small core (state.json) + 16 part files (media-NN.json, cloudparts.js). Each file carries its
+// ── Vehicular's own state on Drive: a small core (state.json) + 16 part files (media-NN.json, cloudparts.js). Each file carries its
 // revision in appProperties.rev; one folder listing tells which files another device wrote since we last read or wrote them.
 // Only those are downloaded, and only the files whose content changed are uploaded (fingerprint in appProperties.h).
 let seenState = null;        // {id, rev, modifiedTime} of state.json as last read or written (kept for the changes feed)
@@ -556,7 +556,7 @@ async function setAside(dir, f) {
   delete fileIds[f.name]; delete seen[f.name]; delete ids[`file:${dir}/${f.name}`]; persistIds(); lastWritten.delete(`${dir}/${f.name}`); stats.healed++;   // the next save creates a fresh file of that name
 }
 /** Read what moved on Drive since we last looked. all: read every file (a fresh device, a full pass, a recovery).
- *  → null when Autolime has nothing on Drive yet, else { core (or null), parts {name: data}, changed: [names], salvaged } */
+ *  → null when Vehicular has nothing on Drive yet, else { core (or null), parts {name: data}, changed: [names], salvaged } */
 export async function loadRemoteState(root, { all = false } = {}) {
   const dir = await meDir(root);
   const by = await listMine(dir);
@@ -643,8 +643,8 @@ export async function listBackups(root) {
 }
 export async function readBackup(id) { return readJsonFile({ id }); }
 
-// ════════════════════════════════════════ photos (receipts, the windscreen sticker, papers, accidents) in Autolime's own folder
-/** Upload a picture into photos/<kind>/ in Autolime's folder. → { id, name } */
+// ════════════════════════════════════════ photos (receipts, the windscreen sticker, papers, accidents) in Vehicular's own folder
+/** Upload a picture into photos/<kind>/ in Vehicular's folder. → { id, name } */
 export async function uploadPhoto(root, kind, name, blob, props = {}) {
   const me = await meDir(root), photos = await childFolder(me, 'photos'), dir = await childFolder(photos, kind);
   const boundary = 'autolime' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

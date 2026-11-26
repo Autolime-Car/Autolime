@@ -1,4 +1,6 @@
-# Autolime — notes for Claude
+# Vehicular (was Autolime) — notes for Claude
+
+- Renamed Autolime → **Vehicular** on 26/11/2026 (display name only). Internal ids stay `autolime`: the Drive tag `citrusApp=autolime`, status.json `app: autolime`, localStorage/IndexedDB keys, the repo and the URL. New Drive folders are named "Car - Vehicular"; old ones are found by tag.
 
 - The owner's car app (the citrus family). Split out of Calamansi's Car tab on 25/11/2026 (handoff: project doc `claude/autolime-handoff.md`; owner facts: `claude/owner-profile.md`). Plain English in the UI, dates dd/mm/yyyy, metric, SAR; Arabic workshop words beside every part.
 - Vanilla ES-module PWA, no build step, served by GitHub Pages from `main` `/docs` at https://autolime-car.github.io/Autolime/.
@@ -11,6 +13,6 @@
 - Before every deploy: `bash test/all.sh` must pass, then `sh scripts-bump.sh` (service-worker module list and cache name).
 - Never commit real personal data: no plate, VIN, policy number, names or phone numbers. Tests use `test/fixture.mjs` and `test/policy-sample.*` (made up). Real data arrives only through the owner's tap (migration, setup link, setup file).
 - Browser tests pin the clock and run in Asia/Riyadh. Keep `tools/check-imports.mjs` green. `tools/icons.mjs` redraws the PNG icons from `docs/icons/icon.svg`.
-- Design: "the garage dashboard" in motor-oil colours — Clean = "the sump" (used-oil black, faint oil-slick sheen, oil-gold #f5b931 instruments; default), Paper = the workshop manual (cream, grid, oil-brown ink #5a3208), Arcade = 8-bit. Warnings are orange #ff8a2a, never the oil gold; OK is green. Saira Condensed for numbers, Manrope for text, Noto Kufi Arabic for Arabic. The four signature marks (the logo is a car wheel: tread tyre, citrus rim with six spokes, lug-nut hub, one oil-gold segment that lets fall a drop of oil; corner fold, peel curl, pip) as in `claude/signature.md`.
+- Design: "the garage dashboard" in motor-oil colours, no citrus orange (owner, 26/11/2026). Clean = "the sump" (used-oil black, faint oil-slick sheen, oil-gold #f5b931 instruments; default), Paper = the workshop manual (cream, grid, oil-brown ink #5a3208), Arcade = 8-bit. Telltales: soon = oil-slick violet #a98bff, late = red, OK = green — never the gold. Saira Condensed for numbers, Manrope for text, Noto Kufi Arabic for Arabic. Logo: "5D · Slick + spokes" — a tyre with tread blocks, an iridescent oil-slick ring, five slim gold spokes and a gold cap with a V (`design/logos5/D-slick-spokes.svg`; the other candidates are in `design/logos/` and `design/logos5/`). Signature marks (corner fold, fitted peel under titles, pip) in oil gold.
 - Add seminal upgrades to the App Building Master Log (skill: app-master-log).
 - Simple by default: every optional feature is a toolbox tool (`extras.js TOOLS`), off unless switched on; never put a new feature straight on a main screen.

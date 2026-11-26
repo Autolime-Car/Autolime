@@ -1,4 +1,4 @@
-// What Autolime tells the other apps (pure, no DOM): status.json in its own Drive folder (HUB.md contract v2) — the one-line
+// What Vehicular tells the other apps (pure, no DOM): status.json in its own Drive folder (HUB.md contract v2) — the one-line
 // summary, the next thing to do, metrics, what is waiting on you, dated tasks for care and papers, the service slot it asks
 // Citrus for (on a day off before the planned service), deep links, and extra { car, plan, trip, papers } for Citrus's tile.
 // Never the plate, VIN, policy number or any money beyond your own totals.
@@ -43,7 +43,7 @@ export function buildStatus(s, now = new Date()) {
     { id: 'fuel', label: 'Log fuel', url: `${base}?do=fuel`, icon: '⛽', minutes: 1 },
     { id: 'accident', label: 'Accident card', url: `${base}?do=accident`, icon: '🚨' },
   ];
-  const head = { app: 'autolime', title: 'Autolime', icon: '🚗', color: '#f5b931', url: base, contract: CONTRACT, updatedAt: now.toISOString(), drive: { byTag: true } };
+  const head = { app: 'autolime', title: 'Vehicular', icon: '🚗', color: '#f5b931', url: base, contract: CONTRACT, updatedAt: now.toISOString(), drive: { byTag: true } };
   if (!car) return { ...head, summary: 'No car yet', today: { date: t, done: true }, next: null, asks: [], metrics: [], pending: [], inbox: [], actions, extra: {} };
 
   const items = car.model ? CC.plan(car, now) : [], hp = CC.health(items), urgent = items.filter(x => x.state === 'late' || x.state === 'soon');
@@ -81,7 +81,7 @@ export function buildStatus(s, now = new Date()) {
   if (until && until >= startOfDay(now)) {
     const off = daysOff(addDays(now, 1), until);
     const day = car.plan?.date && off.includes(car.plan.date) ? car.plan.date : off[0];
-    if (day) asks.push({ date: day, title: `Autolime: workshop for ${car.name}`, minutes: 180, slot: 'free' });
+    if (day) asks.push({ date: day, title: `Vehicular: workshop for ${car.name}`, minutes: 180, slot: 'free' });
   }
   const trip = car.trip && !car.trip.closed ? car.trip : null;
   if (trip?.date && trip.date >= t) { const work = workDays(fromKey(trip.date), fromKey(tripEnd(trip))); if (work.length) pending.push(`Road trip: ${plural(work.length, 'shift')} to take leave for`); }

@@ -1,4 +1,4 @@
-// Autolime — the car app of the citrus family. Care by km or date with the Arabic workshop words, the planned service and
+// Vehicular — the car app of the citrus family. Care by km or date with the Arabic workshop words, the planned service and
 // the list for the counter, quotes and workshops, papers and renewals, fuel and money, road trips, codes, noises, the anatomy
 // and the accident card. Split out of Calamansi's Car tab (25/11/2026). Vanilla ES modules, no build step.
 import * as store from './store.js';
@@ -29,7 +29,7 @@ import { renderGarage, garagePart, quoteSheet, partSheet } from './ui-garage.js'
 import { checkBackup, describeCounts } from './backup-check.js';
 import { h, toast, keyOf, addDays, startOfDay, fromKey, fmtDate, DAY_NAMES, MONTHS, uid } from './util.js';
 
-export const VERSION = '1.4.0';
+export const VERSION = '2.0.0';
 const CITRUS_URL = 'https://amaerys.github.io/citrus-maxima/';
 const CALAMANSI_URL = 'https://calamansi-food.github.io/Calamansi/';
 
@@ -103,7 +103,7 @@ function applyLook() { const l = CZ.custom(S()).look, r = document.documentEleme
 function cheer(from) {
   if (!CZ.custom(S()).look.fun || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const r = (from?.getBoundingClientRect?.() || { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 }), x = r.left + r.width / 2, y = r.top + r.height / 2;
-  const colors = ['#f5b931', '#ff7a1a', '#ffd36b', '#3ad6f2', '#f4eee3'];
+  const colors = ['#f5b931', '#ffd36b', '#3ad6f2', '#f4eee3'];
   for (let i = 0; i < 18; i++) { const p = document.createElement('i'), a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 90; p.className = 'confetti'; p.style.cssText = `left:${x}px;top:${y}px;background:${colors[i % colors.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 40}px;--r:${Math.random() * 540 - 270}deg;`; document.body.append(p); setTimeout(() => p.remove(), 1000); }
 }
 function undoTo(before) { store.replaceState(before, { bump: true, exact: S() }); render(); toast('Undone'); }
@@ -170,7 +170,7 @@ function render() {
   const y = window.scrollY, focusCode = document.activeElement?.classList?.contains('code-in');
   let body; try { body = fn(); } catch (e) { console.error(e); body = crashCard(e); }
   el.replaceChildren(...[backBar(), authBanner(), body].flat(Infinity).filter(Boolean));
-  if (!el.querySelector('h1')) el.prepend(h('h1', { class: 'sr-only' }, VIEW_NAMES[rt.view] || 'Autolime'));
+  if (!el.querySelector('h1')) el.prepend(h('h1', { class: 'sr-only' }, VIEW_NAMES[rt.view] || 'Vehicular'));
   if (focusCode) el.querySelector('.code-in')?.focus();
   if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
   const pt = document.getElementById('pageTitle'), d = new Date(); if (pt) pt.textContent = `${DAY_NAMES[d.getDay()].slice(0, 3)} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
@@ -229,7 +229,7 @@ async function pullState(fromConflict = false) {
   const got = await G.loadRemoteState(S().settings.driveFolder, { all });
   store.merged();
   if (!got) { scheduleRemoteSave(); return false; }
-  if (got.core && got.core.app && got.core.app !== 'autolime') throw new Error('state.json on Drive is not Autolime’s — kept your copy (backups are in its backups folder)');
+  if (got.core && got.core.app && got.core.app !== 'autolime') throw new Error('state.json on Drive is not Vehicular’s — kept your copy (backups are in its backups folder)');
   if (!got.changed.length) return false;
   const before = S(), remote = joinParts(got.core || {}, got.parts);
   const merged = mergeStates(before, remote);
@@ -248,13 +248,13 @@ function massDeleteSheet(before, lost) {
   const name = ([c, id]) => before[c][id]?.name || (c === 'quotes' ? 'a quote' : c === 'photos' ? 'a photo' : c);
   const { close } = sheet([h('h2', {}, `${lost.length} thing${lost.length === 1 ? ' was' : 's were'} removed on another device`),
     h('p', { class: 'small' }, `For example: ${lost.slice(0, 5).map(name).join(', ')}${lost.length > 5 ? '…' : ''}.`),
-    h('p', { class: 'small muted' }, 'If that was you, keep it. If not (a mistake, or a device acting up), bring them back: they return on every device. A copy from just before is also kept on Drive in Autolime’s backups.'),
+    h('p', { class: 'small muted' }, 'If that was you, keep it. If not (a mistake, or a device acting up), bring them back: they return on every device. A copy from just before is also kept on Drive in Vehicular’s backups.'),
     h('div', { class: 'row wrap sh-foot' }, h('button', { class: 'btn primary grow', onClick: () => { close(); const now = S(), back = { ...now }; for (const [c, id] of lost) back[c] = { ...(back[c] || {}), [id]: before[c][id] }; store.replaceState(back, { bump: true, exact: now }); render(); toast(`${lost.length} brought back`, 'ok'); } }, 'Bring them back'), h('button', { class: 'btn ghost', onClick: () => close() }, 'Keep them removed'))]);
 }
 const WATCH_KEY = 'autolime.drive.watch';
 function loadWatch() { try { const w = JSON.parse(localStorage.getItem(WATCH_KEY) || 'null'); return w && w.root === S().settings.driveFolder ? w : null; } catch { return null; } }
 function saveWatch(w) { rt.watch = w; try { w ? localStorage.setItem(WATCH_KEY, JSON.stringify(w)) : localStorage.removeItem(WATCH_KEY); } catch {} }
-/** setup.json in Autolime's own Drive folder (left there by Claude) → the "Add your car?" sheet. */
+/** setup.json in Vehicular's own Drive folder (left there by Claude) → the "Add your car?" sheet. */
 async function checkSetup(manual) {
   if (manual && !G.isSignedIn()) { toast('Sign in to Google first (Settings)'); return; }
   let f = null;
@@ -264,13 +264,13 @@ async function checkSetup(manual) {
   rt.setupSeen = f.id;
   setTimeout(() => { go('dash'); SH.setupSheet(f.data, { onAdded: () => G.binSetupFile(f.id).catch(e => console.warn('setup bin', e.message)) }); }, manual ? 0 : 300);
 }
-// One Autolime window talks to Drive at a time (a Web Lock shared by every tab); the others get its changes through the device store.
+// One Vehicular window talks to Drive at a time (a Web Lock shared by every tab); the others get its changes through the device store.
 function withDriveLock(fn, { wait = true } = {}) {
   if (!navigator.locks?.request) return fn(true);
   return navigator.locks.request('autolime-drive', wait ? {} : { ifAvailable: true }, (lock) => fn(!!lock));
 }
 async function refreshAll(manual, opts = {}) {
-  return withDriveLock((got) => { if (!got) { if (manual) toast('Another Autolime window is syncing; this one shows its changes'); return; } return refreshAllInner(manual, opts); }, { wait: false });
+  return withDriveLock((got) => { if (!got) { if (manual) toast('Another Vehicular window is syncing; this one shows its changes'); return; } return refreshAllInner(manual, opts); }, { wait: false });
 }
 // After a failed sync, try again soon and then less often (30 s, 2 min, 5 min, 15 min).
 const RETRY = [30, 120, 300, 900];
@@ -282,7 +282,7 @@ function retryLater(problems) {
   rt.retryTimer = setTimeout(() => { if (rt.online && G.isSignedIn()) refreshAll(false); }, s * 1000);
 }
 async function refreshAllInner(manual, { full = false } = {}) {
-  if (!rt.online) { if (manual) toast('Offline — Autolime syncs when you are back online'); return; }
+  if (!rt.online) { if (manual) toast('Offline — Vehicular syncs when you are back online'); return; }
   if (!G.isSignedIn()) { if (manual) toast(G.wasSignedIn() ? 'Google needs a tap to reconnect' : 'Sign in to Google in Settings'); render(); return; }
   if (rt.syncing) { if (manual) toast('Already syncing…'); return; }
   rt.syncing = true; renderSync();
@@ -356,7 +356,7 @@ function offerMigration(cal, source) {
   setTimeout(() => {
     const { close } = sheet([h('h2', {}, 'Bring your car over from Calamansi?'),
       h('p', { class: 'small' }, `Found in ${source}: ${MIG.describe(counts)}.`),
-      h('p', { class: 'small muted' }, 'Autolime copies them and owns them from now on; nothing is deleted in Calamansi. A car already here keeps whichever copy was edited last. A copy of your Autolime data as it is now is kept on Drive first, and you can Undo.'),
+      h('p', { class: 'small muted' }, 'Vehicular copies them and owns them from now on; nothing is deleted in Calamansi. A car already here keeps whichever copy was edited last. A copy of your Vehicular data as it is now is kept on Drive first, and you can Undo.'),
       h('div', { class: 'row wrap sh-foot' }, h('button', { class: 'btn primary grow', onClick: () => { close(); runMigration(cal); } }, 'Bring it over'), h('button', { class: 'btn ghost', onClick: () => { close(); store.update(s => ({ ...s, migrated: { from: 'skipped', at: Date.now(), counts: {} } })); toast('Skipped. You can do it later in Settings › Backup and data.'); } }, 'Not now'))]);
   }, 300);
 }
@@ -393,7 +393,7 @@ async function calendarForPlan(carId, plan, prev = null) {
   if (!plan?.date) { if (old) store.update(st => ({ ...st, cars: { ...st.cars, [carId]: { ...st.cars[carId], plan: st.cars[carId].plan ? { ...st.cars[carId].plan, eventId: '', calendarId: '' } : null, at: Date.now() } } })); return; }
   const start = fromKey(plan.date); start.setHours(9, 0, 0, 0); const end = new Date(start); end.setHours(12);
   const shop = s.workshops?.[plan.shop];
-  const ev = await G.createEvent(calId, { title: `🔧 ${c.name}: service (${plan.items.length} items)`, start, end, location: shop?.area || '', description: [`Autolime planned service${shop ? ` at ${shop.name}` : ''}.`, '', ...plan.items.map(i => `• ${CC.ITEMS[i]?.label} — ${CC.ITEMS[i]?.ar}`), '', `${HUB.SITE_URL}?do=service`].join('\n'), tag: 'service', key: `svc-${carId}-${plan.date}`, reminders: [15 * 60, 60] });
+  const ev = await G.createEvent(calId, { title: `🔧 ${c.name}: service (${plan.items.length} items)`, start, end, location: shop?.area || '', description: [`Vehicular planned service${shop ? ` at ${shop.name}` : ''}.`, '', ...plan.items.map(i => `• ${CC.ITEMS[i]?.label} — ${CC.ITEMS[i]?.ar}`), '', `${HUB.SITE_URL}?do=service`].join('\n'), tag: 'service', key: `svc-${carId}-${plan.date}`, reminders: [15 * 60, 60] });
   store.update(st => { const car = st.cars?.[carId]; if (!car?.plan) return st; return L.saveCar(st, { ...car, plan: { ...car.plan, eventId: ev.id, calendarId: calId } }); });
   toast('In your calendar', 'ok');
 }
@@ -403,7 +403,7 @@ async function calendarForPlan(carId, plan, prev = null) {
 async function calendarForPapers(carId) {
   const s = S(), c = s.cars?.[carId]; if (!c) return { created: 0, deleted: 0 };
   const calId = s.settings.planCalendarId || 'primary';
-  const want = EX.paperEvents(c, L.driverOf(s).licence, L.CAR_PAPERS).map(e => { const start = fromKey(e.date); return { title: e.title, start, end: addDays(start, 1), allDay: true, key: e.key, reminders: [40320, 10080], description: `Autolime reminder. The istimara and the licence renew in Absher, the fahas at an inspection centre, the insurance with your insurer.\n${HUB.SITE_URL}?do=papers` }; });
+  const want = EX.paperEvents(c, L.driverOf(s).licence, L.CAR_PAPERS).map(e => { const start = fromKey(e.date); return { title: e.title, start, end: addDays(start, 1), allDay: true, key: e.key, reminders: [40320, 10080], description: `Vehicular reminder. The istimara and the licence renew in Absher, the fahas at an inspection centre, the insurance with your insurer.\n${HUB.SITE_URL}?do=papers` }; });
   // the window covers every paper's day (a licence can run ten years), so nothing outside it is added twice
   const days = want.map(e => e.start.getTime()), from = addDays(new Date(Math.min(Date.now(), ...days)), -3), to = addDays(new Date(Math.max(Date.now(), ...days)), 3);
   return G.syncTaggedEvents(calId, `papers-${carId}`, from, to, want);
@@ -518,7 +518,7 @@ async function backupsSheet() {
   let list = [];
   try { list = await G.listBackups(S().settings.driveFolder); } catch (e) { return toast(e.message, 'err'); }
   const { close } = sheet([h('h2', {}, 'Restore a daily backup'),
-    h('p', { class: 'small muted' }, 'Autolime keeps one snapshot of your cars, workshops, quotes and photo records per day on Drive (Car - Autolime › backups, newest 14). Photos themselves stay in their folder.'),
+    h('p', { class: 'small muted' }, 'Vehicular keeps one snapshot of your cars, workshops, quotes and photo records per day on Drive (Car - Vehicular › backups, newest 14). Photos themselves stay in their folder.'),
     list.length ? h('div', { class: 'rows' }, ...list.map(b => h('div', { class: 'item', style: { cursor: 'default' } }, h('span', { class: 'im' }, h('span', { class: 'in' }, b.name.replace(/^state-|\.json$/g, '')), h('span', { class: 'id' }, `${Math.max(1, Math.round(b.size / 1024))} KB`)),
       h('button', { class: 'btn sm', onClick: async () => { try { const j = await G.readBackup(b.id); close(); restoreSheet(j, { source: `Drive backup ${b.name}` }); } catch (e) { toast(e.message, 'err'); } } }, 'Restore')))) : h('div', { class: 'muted small' }, 'No backups yet — the first is made after today’s sync.')]);
 }
@@ -555,9 +555,9 @@ function undoRestore() { const snap = preRestore(); if (!snap?.state) { toast('N
 const ago = (t) => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString('en-GB'); };
 function cloudState() {
   const s = S(), signed = G.isSignedIn(), waiting = rt.saveDirty, probs = rt.lastProblems || [];
-  if (!s.settings.clientId || (!signed && !G.wasSignedIn())) return { tone: 'off', head: 'Only on this device', sub: 'Sign in with Google to keep a copy on your Drive and use Autolime on your other devices.' };
-  if (!signed) return { tone: 'warn', head: 'Google needs a tap', sub: 'Everything is safe on this device. Tap Reconnect and Autolime saves to Drive again.' };
-  if (!rt.online) return { tone: 'warn', head: waiting ? 'Saved on this device, waiting for a connection' : 'Offline', sub: 'Autolime saves to Drive by itself when you are back online.' };
+  if (!s.settings.clientId || (!signed && !G.wasSignedIn())) return { tone: 'off', head: 'Only on this device', sub: 'Sign in with Google to keep a copy on your Drive and use Vehicular on your other devices.' };
+  if (!signed) return { tone: 'warn', head: 'Google needs a tap', sub: 'Everything is safe on this device. Tap Reconnect and Vehicular saves to Drive again.' };
+  if (!rt.online) return { tone: 'warn', head: waiting ? 'Saved on this device, waiting for a connection' : 'Offline', sub: 'Vehicular saves to Drive by itself when you are back online.' };
   if (rt.syncing) return { tone: 'busy', head: 'Saving to Drive…', sub: '' };
   if (probs.length) return { tone: 'bad', head: 'Not saved to Drive yet', sub: `${probs[0].replace(/^\w+: /, '')}${rt.nextRetry ? ` Trying again ${Math.max(1, Math.round((rt.nextRetry - Date.now()) / 60000))} min from now.` : ''} Nothing is lost: it is all on this device.` };
   if (waiting) return { tone: 'busy', head: 'A change is waiting to be saved', sub: 'It goes to Drive within a few seconds.' };
@@ -570,7 +570,7 @@ function cloudCard() {
     h('div', { class: 'cd-head' }, h('span', { class: 'cd-dot' }), h('div', {}, h('div', { class: 'cd-h' }, c.head), c.sub ? h('div', { class: 'small muted' }, c.sub) : null)),
     h('div', { class: 'cd-rows' },
       row(store.persistence.ok, 'On this device', store.persistence.ok ? `${n('cars')} car${n('cars') === 1 ? '' : 's'}, ${n('workshops')} workshops, ${n('quotes')} quotes · ${dv.idb ? 'kept twice' : 'browser storage'} · ${Math.max(1, Math.round((dv.bytes || store.persistence.bytes || JSON.stringify(s).length * 2) / 1024)).toLocaleString('en')} KB` : store.persistence.lastError),
-      row(G.isSignedIn() ? !(rt.lastProblems || []).length : null, 'On your Drive', G.isSignedIn() ? `${G.ownTagged() ? 'Car - Autolime, found by its tag' : 'Car - Autolime'} · 9 small files, only the changed ones are sent` : 'not connected'),
+      row(G.isSignedIn() ? !(rt.lastProblems || []).length : null, 'On your Drive', G.isSignedIn() ? `${G.ownTagged() ? 'Car - Vehicular, found by its tag' : 'Car - Vehicular'} · 9 small files, only the changed ones are sent` : 'not connected'),
       row(G.isSignedIn() ? !pend : null, 'Photos', pend ? `${pend} on this phone, going to Drive on the next sync` : G.isSignedIn() ? 'all on your Drive (photos folder)' : 'kept on this phone until you sign in'),
       row(G.isSignedIn() ? true : null, 'Backups', G.isSignedIn() ? 'one a day on Drive (the last 14), and one before every big change' : 'download one below'),
       row(true, 'Two devices at once', 'changes merge record by record; nothing is overwritten')),
@@ -625,7 +625,7 @@ function renderMore() {
   const out = [h('h1', {}, 'Settings'), cloudCard(), toolboxCard(), uiPicker(), customiseCard()];
   const cid = h('input', { type: 'text', value: s.settings.clientId, spellcheck: false, 'aria-label': 'OAuth client ID' });
   out.push(h('div', { class: 'card' }, h('div', { class: 'title' }, 'Google'),
-    h('div', { class: 'small muted' }, 'Drive keeps Autolime in step on all your devices (Citrus › Life › Car - Autolime), holds your photos, tells Citrus how the car is doing and reads your days off from Mandarin. Calendar holds the service day.'),
+    h('div', { class: 'small muted' }, 'Drive keeps Vehicular in step on all your devices (Citrus › Life › Car - Vehicular), holds your photos, tells Citrus how the car is doing and reads your days off from Mandarin. Calendar holds the service day.'),
     h('div', { class: 'row wrap', style: { marginTop: '8px' } },
       signed ? h('button', { class: 'btn', onClick: () => { G.signOut(); saveWatch(null); render(); } }, 'Sign out') : h('button', { class: 'btn primary', onClick: async () => { try { const id = cid.value.trim() || s.settings.clientId; if (id !== s.settings.clientId) store.update(x => ({ ...x, settings: { ...x.settings, clientId: id } }), { remote: false }); if (!G.ready() || id !== s.settings.clientId) await G.init(id); await G.signIn({ renew: G.wasSignedIn() }); toast('Signed in', 'ok'); refreshAll(true, { full: true }); } catch (e) { toast(e.message, 'err'); } } }, G.wasSignedIn() ? 'Reconnect Google' : 'Sign in with Google'),
       signed ? h('button', { class: 'btn', onClick: () => refreshAll(true) }, '↻ Sync now') : null, signed ? h('button', { class: 'btn', onClick: backupsSheet }, '⟲ Daily backups') : null),
@@ -634,16 +634,16 @@ function renderMore() {
     h('details', { class: 'adv' }, h('summary', { class: 'small' }, 'Advanced'), h('div', { class: 'field' }, h('label', {}, 'OAuth client ID (the one Google Cloud client all your apps share)'), cid, h('div', { class: 'tiny dim' }, 'Only the client ID, never the secret. This site must be in the client’s “Authorised JavaScript origins”.')),
       h('button', { class: 'btn sm', onClick: async () => { store.update(x => ({ ...x, settings: { ...x.settings, clientId: cid.value.trim() } }), { remote: false }); try { await G.init(cid.value.trim()); toast('Saved', 'ok'); } catch (e) { toast(e.message, 'err'); } } }, 'Save ID'))));
   out.push(h('div', { class: 'card' }, h('div', { class: 'title' }, 'Your apps'),
-    h('div', { class: 'small muted' }, 'Autolime owns the car: care, papers, the driver, fuel, trips, workshops and quotes. It writes status.json for Citrus (the car tile, the service day and the trip on Plan, renewals as dated tasks) and reads Mandarin’s shifts.json for your days off. It never writes into another app’s folder.'),
+    h('div', { class: 'small muted' }, 'Vehicular owns the car: care, papers, the driver, fuel, trips, workshops and quotes. It writes status.json for Citrus (the car tile, the service day and the trip on Plan, renewals as dated tasks) and reads Mandarin’s shifts.json for your days off. It never writes into another app’s folder.'),
     h('div', { class: 'row wrap', style: { marginTop: '8px' } }, h('a', { class: 'btn sm', href: `${CITRUS_URL}?from=autolime`, target: '_blank', rel: 'noopener' }, '🍊 Open Citrus'), h('a', { class: 'btn sm', href: `${CALAMANSI_URL}?from=autolime`, target: '_blank', rel: 'noopener' }, '🍋 Open Calamansi'), signed ? h('button', { class: 'btn sm', onClick: () => publish().then(() => toast('Published', 'ok')).catch(e => toast(e.message, 'err')) }, 'Publish now') : null)));
   out.push(h('div', { class: 'card' }, h('div', { class: 'title' }, 'Backup and data'),
     h('div', { class: 'row wrap' },
       h('button', { class: 'btn', onClick: downloadBackup }, '⬇ Backup'),
-      (() => { const inp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onChange: async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; let j; try { j = JSON.parse(await f.text()); } catch { return toast(`${f.name} is not a backup file`, 'err'); } if (MIG.looksLikeCalamansi(j)) { migrationOffered = false; offerMigration(j, f.name); return; } restoreSheet(j, { source: f.name }); } }); return h('span', {}, inp, h('button', { class: 'btn', title: 'An Autolime backup, or a Calamansi backup to bring the car over', onClick: () => inp.click() }, '⬆ Restore or import')); })(),
+      (() => { const inp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onChange: async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; let j; try { j = JSON.parse(await f.text()); } catch { return toast(`${f.name} is not a backup file`, 'err'); } if (MIG.looksLikeCalamansi(j)) { migrationOffered = false; offerMigration(j, f.name); return; } restoreSheet(j, { source: f.name }); } }); return h('span', {}, inp, h('button', { class: 'btn', title: 'An Vehicular backup, or a Calamansi backup to bring the car over', onClick: () => inp.click() }, '⬆ Restore or import')); })(),
       preRestore() ? h('button', { class: 'btn', onClick: undoRestore }, '↶ Undo restore') : null,
       h('button', { class: 'btn', onClick: migrateNow }, '🍋 Bring my car over from Calamansi'),
       h('button', { class: 'btn danger', onClick: eraseSheet }, 'Erase this device…')),
-    h('div', { class: 'tiny dim', style: { marginTop: '10px' } }, `Autolime ${VERSION} · your data lives in this browser and your own Google Drive.`)));
+    h('div', { class: 'tiny dim', style: { marginTop: '10px' } }, `Vehicular ${VERSION} · your data lives in this browser and your own Google Drive.`)));
   out.push(diagnosticsCard());
   return out;
 }
@@ -651,8 +651,8 @@ function downloadBackup() { const blob = new Blob([store.exportJSON()], { type: 
 const ownKeys = () => { const out = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('autolime.')) out.push(k); } } catch {} return out; };
 function eraseSheet() {
   const signed = G.isSignedIn() || G.wasSignedIn();
-  const { close } = sheet([h('h2', {}, 'Erase Autolime on this device?'),
-    h('p', { class: 'small' }, `This removes Autolime's data from this browser only (${ownKeys().length} saved items) and the photos kept on this phone.`),
+  const { close } = sheet([h('h2', {}, 'Erase Vehicular on this device?'),
+    h('p', { class: 'small' }, `This removes Vehicular's data from this browser only (${ownKeys().length} saved items) and the photos kept on this phone.`),
     h('p', { class: 'small muted' }, signed ? 'Your Google Drive copy is not touched: sign in again and the next sync brings everything back. Photos still waiting to upload would be lost.' : 'You are not using Google sync, so nothing else holds a copy: download a backup first.'),
     h('div', { class: 'row wrap sh-foot' }, h('button', { class: 'btn', onClick: downloadBackup }, '⬇ Backup first'), h('button', { class: 'btn danger grow', onClick: () => { for (const k of ownKeys()) try { localStorage.removeItem(k); } catch {} try { indexedDB.deleteDatabase('autolime.photos'); indexedDB.deleteDatabase('autolime'); } catch {} close(); location.reload(); } }, 'Erase this device'), h('button', { class: 'btn ghost', onClick: () => close() }, 'Cancel'))]);
 }

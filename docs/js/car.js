@@ -1,6 +1,6 @@
 // The car on paper and on the road: saving a car (identity, papers, insurance, tyres, the planned service, the trip), the
 // driver, and what needs you (papers within their window, care items due). Pure (no DOM). Dates are dd/mm/yyyy on screen.
-// Autolime only reminds: renewals are done in Absher, at the inspection centre and with the insurer.
+// Vehicular only reminds: renewals are done in Absher, at the inspection centre and with the insurer.
 import { keyOf, fromKey, addDays, startOfDay, uid } from './util.js';
 import * as CC from './carcare.js';
 import { cleanX } from './extras.js';
@@ -15,7 +15,7 @@ export const daysUntil = (key, now = new Date()) => isKey(key) ? Math.round((fro
 
 // ───────────────────────── the car
 // Saudi papers: istimara (registration), fahas (periodic inspection, MVPI), and the insurance. Renewals are done in Absher /
-// the inspection centres; Autolime only remembers the dates.
+// the inspection centres; Vehicular only remembers the dates.
 export const CAR_PAPERS = [['istimara', 'Istimara (registration)', '📄', 30], ['fahas', 'Fahas (inspection)', '🔧', 30], ['insurance', 'Insurance', '🛡️', 21]];
 export function saveCar(s, c, now = new Date()) {
   const name = txt(c.name, 40); if (!name) return s; const id = c.id || 'c' + uid();

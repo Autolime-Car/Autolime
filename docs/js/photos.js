@@ -1,6 +1,6 @@
 // Photos: receipts, the windscreen service sticker, the istimara and policy (the papers wallet), and accident pictures.
 // A picture is shrunk on the phone (longest side 1600 px, JPEG), kept on this device first (IndexedDB) so it is never lost
-// offline or mid-accident, then uploaded to your own Drive (Car - Autolime/photos/<kind>/) on the next sync. Only the
+// offline or mid-accident, then uploaded to your own Drive (Car - Vehicular/photos/<kind>/) on the next sync. Only the
 // record (kind, date, note, Drive id) is synced in state.json; the picture itself lives in Drive.
 import { keyOf, uid } from './util.js';
 

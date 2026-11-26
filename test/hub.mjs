@@ -1,4 +1,4 @@
-// Autolime against an in-memory Google (Drive + Calendar + sign-in): the first sign-in makes "Car - Autolime" inside the
+// Autolime against an in-memory Google (Drive + Calendar + sign-in): the first sign-in makes "Car - Vehicular" inside the
 // tagged Life area (and tags it), offers to bring the car over from Calamansi's state.json (with Undo), reads days off from
 // Mandarin's shifts.json, writes status.json only in its own folder, uploads a photo to photos/<kind>, puts the service day
 // in the calendar, and two devices converge. A fresh device finds the folder by tag after Citrus moves it.
@@ -33,7 +33,7 @@ const sync = async (p) => { await until(p, () => !window.__autolime.rt.syncing);
 console.log('first sign-in on the phone');
 const A = await device('phone');
 check(await until(A.p, () => !!document.querySelector('.sheet h2')?.textContent.includes('Bring your car over')), 'offers to bring the car over from Calamansi');
-const own = [...g.files.values()].filter(f => f.name === 'Car - Autolime' && !f.trashed);
+const own = [...g.files.values()].filter(f => f.name === 'Car - Vehicular' && !f.trashed);
 check(own.length === 1 && own[0].parents.includes(life) && own[0].appProperties?.citrusApp === 'autolime', 'its folder is made once, inside Citrus/Life, and tagged');
 check(![...g.files.values()].some(f => f.name === 'My Apps'), 'no My Apps folder is made');
 await A.p.click('.sheet button:has-text("Bring it over")'); await sleep(500);
@@ -46,10 +46,10 @@ check([...g.files.values()].some(f => /before-migration/.test(f.name)), 'a backu
 
 console.log('sync, status, days off');
 await sync(A.p);
-const status = g.readJsonAt(['Citrus', 'Life', 'Car - Autolime'], 'status.json');
+const status = g.readJsonAt(['Citrus', 'Life', 'Car - Vehicular'], 'status.json');
 check(status?.app === 'autolime' && status.drive?.byTag, 'status.json in its own folder, by tag');
 check(status.extra?.car?.name === 'Test Camry', 'the car tile for Citrus');
-check(g.readJsonAt(['Citrus', 'Life', 'Car - Autolime'], 'state.json')?.app === 'autolime', 'state.json saved');
+check(g.readJsonAt(['Citrus', 'Life', 'Car - Vehicular'], 'state.json')?.app === 'autolime', 'state.json saved');
 check(await A.p.evaluate(() => window.__autolime.R.has()), 'shifts read from Mandarin');
 const writesElsewhere = [...g.files.values()].filter(f => !f.trashed && f.mimeType !== 'application/vnd.google-apps.folder' && (f.parents.includes(calDir) || f.parents.includes(manDir))).map(f => f.name).sort();
 check(writesElsewhere.join() === 'shifts.json,state.json', `nothing written into Calamansi or Mandarin (${writesElsewhere.join(', ')})`);
@@ -89,7 +89,7 @@ await chooser.setFiles({ name: 'ist.png', mimeType: 'image/png', buffer: png });
 check(await until(A.p, () => Object.values(JSON.parse(localStorage.getItem('autolime.state.v1')).photos || {}).some(p => p.file)), 'the photo uploads and its record gets the Drive id');
 const photo = [...g.files.values()].find(f => f.appProperties?.autolime === 'istimara');
 const pdir = photo && g.files.get(photo.parents[0]), pparent = pdir && g.files.get(pdir.parents[0]);
-check(pdir?.name === 'istimara' && pparent?.name === 'photos', 'it lives in Car - Autolime/photos/istimara');
+check(pdir?.name === 'istimara' && pparent?.name === 'photos', 'it lives in Car - Vehicular/photos/istimara');
 
 console.log('a second device');
 await sync(A.p);

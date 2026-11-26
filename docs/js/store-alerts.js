@@ -1,4 +1,4 @@
-// Banners for the two storage problems the user must know about: this device's saved copy was damaged (and what Autolime did),
+// Banners for the two storage problems the user must know about: this device's saved copy was damaged (and what Vehicular did),
 // and this device can no longer save (storage full). Loaded by store.js only when one of them happens.
 import { h, fmtTime } from './util.js';
 
@@ -31,10 +31,10 @@ export function showStoreAlerts({ recovery, persistence, corruptCopy, dismissRec
   if (rec && !document.querySelector('.d10-alert[data-id="recovery"]') && !rec.shown) {
     rec.shown = true;
     const damaged = rec.reason === 'unreadable';
-    const from = rec.from?.length ? `Recovered from ${rec.from.map(f => f === 'backup' ? 'this device\'s last clean copy' : 'the part that could still be read').join(' and ')}.` : 'Nothing could be read from it, so Autolime started empty.';
+    const from = rec.from?.length ? `Recovered from ${rec.from.map(f => f === 'backup' ? 'this device\'s last clean copy' : 'the part that could still be read').join(' and ')}.` : 'Nothing could be read from it, so Vehicular started empty.';
     banner('recovery', {
       tone: damaged ? 'err' : 'warn',
-      title: damaged ? 'Your saved data on this device was damaged' : `Autolime skipped ${rec.fixed} damaged item${rec.fixed === 1 ? '' : 's'}`,
+      title: damaged ? 'Your saved data on this device was damaged' : `Vehicular skipped ${rec.fixed} damaged item${rec.fixed === 1 ? '' : 's'}`,
       text: damaged
         ? `${from} ${rec.kept ? 'The damaged copy is kept on this device. ' : ''}If you use Google sync, your Drive copy merges back in on the next sync; daily backups are in Settings › Drive.`
         : `Some saved records were unreadable and were left out, so the rest of the app keeps working${rec.kept ? '. The original copy is kept on this device' : ''}.`,
@@ -50,7 +50,7 @@ export function showStoreAlerts({ recovery, persistence, corruptCopy, dismissRec
     banner('persist', {
       tone: 'err',
       title: `Not saved on this device${persistence.since ? ` since ${fmtAt(persistence.since)}` : ''}`,
-      text: `${persistence.lastError || 'Saving failed'}. Edits stay only until you close Autolime. Sync to Google Drive, or download a backup now, then free some space.`,
+      text: `${persistence.lastError || 'Saving failed'}. Edits stay only until you close Vehicular. Sync to Google Drive, or download a backup now, then free some space.`,
       actions: [['Download backup', () => download(exportJSON(), `citrus-maxima-backup-${new Date().toISOString().slice(0, 10)}.json`), true], ['Settings', openSettings]],
     });
   } else if (persistence.ok && full) full.remove();

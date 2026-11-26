@@ -1,5 +1,5 @@
-/* Autolime — the garage dashboard. Three interfaces, chosen per device:
-   Clean  = "the sump": used-oil black with a faint oil-slick sheen, fresh-oil gold instruments, orange and red telltales (the default)
+/* Vehicular — the garage dashboard. Three interfaces, chosen per device:
+   Clean  = "the sump": used-oil black with a faint oil-slick sheen, fresh-oil gold instruments; telltales violet (soon, an oil-slick hue) and red (late), never the gold
    Paper  = the workshop manual: cream paper, a faint grid, oil-brown ink and the odd golden oil stain
    Arcade = the citrus family's 8-bit look
    Numbers (km, days, SAR) are set in Saira Condensed like an instrument cluster; Arabic workshop words in Noto Kufi Arabic. */
@@ -9,14 +9,14 @@
   --num: 'Saira Condensed', 'Manrope', system-ui, sans-serif;
   --ar: 'Noto Kufi Arabic', 'Geeza Pro', 'Segoe UI', system-ui, sans-serif;
   --r: 16px; --r2: 11px; --gap: 12px; --pad: 16px;
-  --oil: #f5b931; --oil-deep: #b8730a; --oil-pale: #ffe3a0; --amber: #ff8a2a; --red: #ff4438; --green: #47d18c; --cyan: #3ad6f2;
+  --oil: #f5b931; --oil-deep: #b8730a; --oil-pale: #ffe3a0; --amber: #a98bff; --red: #ff4438; --green: #47d18c; --cyan: #3ad6f2;
   --acc: var(--oil); --acc-ink: #1c1203;
-  --sig: #ff7a1a; --sig-deep: #e0600a; --sig-pale: #ffd9b8; --sig-app: #f5b931;
+  --sig: #f5b931; --sig-deep: #b8730a; --sig-pale: #ffe3a0; --sig-app: #f5b931;
   --sheen: radial-gradient(60% 40% at 88% -6%, rgba(110, 80, 220, .10), transparent 70%), radial-gradient(50% 35% at 72% -4%, rgba(60, 150, 200, .07), transparent 70%);
   color-scheme: dark;
 }
 :root[data-accent="honey"] { --acc: #ffd36b; --acc-ink: #1c1203; }
-:root[data-accent="copper"] { --acc: #e8864a; --acc-ink: #1a0a00; }
+:root[data-accent="gunmetal"] { --acc: #b9c3cc; --acc-ink: #111418; }
 :root[data-accent="cyan"] { --acc: var(--cyan); --acc-ink: #001418; }
 :root[data-accent="red"] { --acc: #ff4b3e; --acc-ink: #fff; }
 
@@ -25,8 +25,8 @@
   --bg: #0c0a07; --bg2: #120f0b; --card: #17130e; --card2: #1e1913; --card3: #262019; --line: #2a231b; --line2: #3a3126;
   --text: #f4eee3; --muted: #b9ac97; --dim: #8b7f6c; --shadow: 0 10px 30px -18px rgba(0, 0, 0, .95);
   --weave: repeating-linear-gradient(45deg, rgba(255, 255, 255, .022) 0 2px, transparent 2px 5px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, .35) 0 2px, transparent 2px 5px);
-  --late-bg: rgba(255, 68, 56, .14); --soon-bg: rgba(255, 138, 42, .13); --ok-bg: rgba(71, 209, 140, .10);
-  --late-tx: #ff7f74; --soon-tx: #ffad6b; --ok-tx: #86e3b2;
+  --late-bg: rgba(255, 68, 56, .14); --soon-bg: rgba(169, 139, 255, .13); --ok-bg: rgba(71, 209, 140, .10);
+  --late-tx: #ff7f74; --soon-tx: #c4b0ff; --ok-tx: #86e3b2;
 }
 /* ───── Paper: the workshop manual */
 :root[data-ui="paper"] {
@@ -35,16 +35,16 @@
   --text: #2a1d10; --muted: #5e4d3a; --dim: #7a6a55; --ink: #5a3208; --shadow: 0 8px 22px -16px rgba(90, 50, 8, .45);
   --acc: #a3620a; --acc-ink: #fff; --sheen: radial-gradient(38% 26% at 92% 4%, rgba(245, 185, 49, .16), transparent 70%), radial-gradient(22% 16% at 6% 96%, rgba(245, 185, 49, .10), transparent 70%);
   --weave: linear-gradient(rgba(90, 50, 8, .06) 1px, transparent 1px) 0 0 / 22px 22px, linear-gradient(90deg, rgba(90, 50, 8, .06) 1px, transparent 1px) 0 0 / 22px 22px;
-  --late-bg: #fde8e6; --soon-bg: #ffecd9; --ok-bg: #e3f5ea; --late-tx: #b3261e; --soon-tx: #a34a00; --ok-tx: #1f7a48;
-  --sig-deep: #c75200; --sig-pale: #ffe6cf;
+  --late-bg: #fde8e6; --soon-bg: #efe9ff; --ok-bg: #e3f5ea; --late-tx: #b3261e; --soon-tx: #5b3fb8; --ok-tx: #1f7a48;
+  --sig: #c98a1c; --sig-deep: #8a5208; --sig-pale: #ffe9b8;
 }
-:root[data-ui="paper"][data-accent="honey"] { --acc: #8a6500; } :root[data-ui="paper"][data-accent="cyan"] { --acc: #00748a; } :root[data-ui="paper"][data-accent="copper"] { --acc: #b5541c; } :root[data-ui="paper"][data-accent="red"] { --acc: #c0261c; }
+:root[data-ui="paper"][data-accent="honey"] { --acc: #8a6500; } :root[data-ui="paper"][data-accent="cyan"] { --acc: #00748a; } :root[data-ui="paper"][data-accent="gunmetal"] { --acc: #4a5866; } :root[data-ui="paper"][data-accent="red"] { --acc: #c0261c; }
 /* ───── Arcade: 8-bit */
 :root[data-ui="arcade"] {
   --bg: #12141f; --bg2: #181b29; --card: #1c2033; --card2: #242942; --card3: #2c3250; --line: #3a4168; --line2: #4c5585;
   --text: #f4f1ff; --muted: #b9b6d6; --dim: #8e8bb2; --r: 4px; --r2: 3px; --shadow: 4px 4px 0 #07080f;
   --font: 'Manrope', system-ui, sans-serif; --num: 'Pixelify Sans', 'Saira Condensed', monospace;
-  --weave: none; --sheen: none; --late-bg: #3a1a26; --soon-bg: #3a2514; --ok-bg: #173326; --late-tx: #ff8a80; --soon-tx: #ffad6b; --ok-tx: #86e3b2;
+  --weave: none; --sheen: none; --late-bg: #3a1a26; --soon-bg: #2a2142; --ok-bg: #173326; --late-tx: #ff8a80; --soon-tx: #c4b0ff; --ok-tx: #86e3b2;
 }
 :root[data-size="small"] { font-size: 14px; } :root[data-size="normal"] { font-size: 15px; } :root[data-size="large"] { font-size: 17px; }
 :root[data-density="compact"] { --gap: 8px; --pad: 12px; }
@@ -88,7 +88,7 @@ nav.tabs .rail-only { display: none; }
 @media (min-width: 900px) {
   body { padding-left: 214px; }
   nav.tabs { top: 0; bottom: 0; right: auto; width: 214px; grid-template-columns: 1fr; align-content: start; gap: 4px; padding: 76px 12px 12px; border-top: 0; border-right: 1px solid var(--line); }
-  nav.tabs::before { content: "AUTOLIME"; position: absolute; top: 22px; left: 18px; font: 700 1.3rem var(--num); letter-spacing: .1em; padding-left: 33px; line-height: 24px; background: no-repeat left center / 23px 23px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15.4' fill='%231b1712'/%3E%3Ccircle cx='16' cy='16' r='14.2' fill='none' stroke='%236a573d' stroke-width='2.4' stroke-dasharray='2.1 1.45'/%3E%3Ccircle cx='16' cy='16' r='11.4' fill='%23ff7a1a'/%3E%3Ccircle cx='16' cy='16' r='9.4' fill='%23ffd9b8'/%3E%3Cpath d='M16 16L24.14 20.7A9.4 9.4 0 0 1 16 25.4Z' fill='%23f5b931'/%3E%3Cpath d='M16 16V6.6M16 16L24.14 11.3M16 16L24.14 20.7M16 16V25.4M16 16L7.86 20.7M16 16L7.86 11.3' stroke='%23ff7a1a' stroke-width='1.4' stroke-linecap='round' fill='none'/%3E%3Ccircle cx='16' cy='16' r='2.4' fill='%23e0600a'/%3E%3C/svg%3E"); }
+  nav.tabs::before { content: "VEHICULAR"; position: absolute; top: 22px; left: 18px; font: 700 1.3rem var(--num); letter-spacing: .1em; padding-left: 33px; line-height: 24px; background: no-repeat left center / 23px 23px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffe08a'/%3E%3Cstop offset='.5' stop-color='%23f5b931'/%3E%3Cstop offset='1' stop-color='%23a8650f'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237b5be0'/%3E%3Cstop offset='.2' stop-color='%232f8fd0'/%3E%3Cstop offset='.4' stop-color='%232fc6b0'/%3E%3Cstop offset='.6' stop-color='%23b8d24a'/%3E%3Cstop offset='.75' stop-color='%23f5b931'/%3E%3Cstop offset='.9' stop-color='%23d0508e'/%3E%3Cstop offset='1' stop-color='%239a4fd8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15.4' fill='%231b1712'/%3E%3Ccircle cx='16' cy='16' r='14.2' fill='none' stroke='%236a573d' stroke-width='2.4' stroke-dasharray='2.1 1.45'/%3E%3Ccircle cx='16' cy='16' r='11.9' fill='%23100c08'/%3E%3Ccircle cx='16' cy='16' r='10.4' fill='none' stroke='url(%23b)' stroke-width='2.6'/%3E%3Cpath d='M15.42 13.26L15.55 7.41L16.45 7.41L16.58 13.26ZM18.42 14.60L24.03 12.92L24.31 13.77L18.78 15.71ZM18.08 17.87L21.41 22.68L20.68 23.21L17.14 18.56ZM14.86 18.56L11.32 23.21L10.59 22.68L13.92 17.87ZM13.22 15.71L7.69 13.77L7.97 12.92L13.58 14.60Z' fill='url(%23a)'/%3E%3Ccircle cx='16' cy='16' r='3.4' fill='url(%23a)'/%3E%3C/svg%3E"); }
   nav.tabs button { grid-template-columns: 26px 1fr; justify-items: start; align-items: center; gap: 12px; padding: 11px 14px; font-size: .92rem; }
   nav.tabs .rail-only { display: grid; }
   nav.tabs button .tab-dot { top: 50%; right: 32px; margin-top: -4px; }
@@ -166,7 +166,7 @@ details.adv > summary { cursor: pointer; padding: 6px 0; font-weight: 700; color
 :root[data-ui="paper"] .gauge .g-track { stroke: rgba(90, 50, 8, .14); }
 .gauge .g-val { fill: none; stroke: var(--acc); stroke-linecap: round; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--acc) 60%, transparent)); transition: stroke-dashoffset 1.1s cubic-bezier(.2, .8, .2, 1); }
 :root[data-ui="paper"] .gauge .g-val { stroke: var(--acc); filter: none; } :root[data-ui="paper"] .gauge.mid .g-val { stroke: #c98a00; } :root[data-ui="paper"] .gauge.bad .g-val { stroke: #c0261c; }
-.gauge.mid .g-val { stroke: var(--amber); filter: drop-shadow(0 0 6px rgba(255, 138, 42, .5)); } .gauge.bad .g-val { stroke: var(--red); filter: drop-shadow(0 0 6px rgba(255, 59, 48, .5)); }
+.gauge.mid .g-val { stroke: var(--amber); filter: drop-shadow(0 0 6px rgba(169, 139, 255, .5)); } .gauge.bad .g-val { stroke: var(--red); filter: drop-shadow(0 0 6px rgba(255, 59, 48, .5)); }
 .gauge .g-tick { stroke: rgba(255, 255, 255, .35); stroke-width: 1.4; } .gauge .g-tick.big { stroke: rgba(255, 255, 255, .7); stroke-width: 2.2; } .gauge .g-tick.red { stroke: var(--red); }
 :root[data-ui="paper"] .gauge .g-tick { stroke: rgba(90, 50, 8, .4); } :root[data-ui="paper"] .gauge .g-tick.big { stroke: var(--ink); }
 .gauge .g-lab { font: 600 9px var(--num); fill: #8f9b93; letter-spacing: .06em; } :root[data-ui="paper"] .gauge .g-lab { fill: var(--muted); }
@@ -189,7 +189,7 @@ details.adv > summary { cursor: pointer; padding: 6px 0; font-weight: 700; color
 .telltales { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .tt { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 7px; border-radius: 9px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08); color: #6f7a73; font: 700 .74rem var(--font); cursor: pointer; }
 .tt svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.tt.soon { color: var(--amber); border-color: rgba(255, 138, 42, .4); background: rgba(255, 138, 42, .08); text-shadow: 0 0 8px rgba(255, 138, 42, .6); } .tt.soon svg { filter: drop-shadow(0 0 4px rgba(255, 138, 42, .8)); }
+.tt.soon { color: var(--amber); border-color: rgba(169, 139, 255, .4); background: rgba(169, 139, 255, .08); text-shadow: 0 0 8px rgba(169, 139, 255, .6); } .tt.soon svg { filter: drop-shadow(0 0 4px rgba(169, 139, 255, .8)); }
 .tt.late { color: #ff5a4f; border-color: rgba(255, 59, 48, .5); background: rgba(255, 59, 48, .1); text-shadow: 0 0 8px rgba(255, 59, 48, .6); } .tt.late svg { filter: drop-shadow(0 0 4px rgba(255, 59, 48, .9)); }
 .tt.ok { color: var(--green); border-color: rgba(71, 209, 140, .28); }
 :root[data-ui="paper"] .tt { background: var(--card2); border-color: var(--line); color: var(--dim); } :root[data-ui="paper"] .tt.soon { color: #8a5a00; background: var(--soon-bg); text-shadow: none; } :root[data-ui="paper"] .tt.late { color: #b3261e; background: var(--late-bg); text-shadow: none; } :root[data-ui="paper"] .tt.ok { color: var(--acc); }
@@ -388,7 +388,7 @@ ol.how { margin: 6px 0 12px; padding-left: 20px; display: grid; gap: 8px; } ol.h
 .ui-opt { display: grid; gap: 4px; padding: 8px; border-radius: 14px; border: 1px solid var(--line2); background: var(--card2); color: var(--text); font: inherit; cursor: pointer; text-align: left; } .ui-opt.sel { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); } .ui-opt small { color: var(--muted); font-size: .72rem; }
 .ui-thumb { height: 46px; border-radius: 9px; display: flex; align-items: end; gap: 3px; padding: 6px; }
 .ui-thumb i { flex: 1; height: 60%; border-radius: 4px; } .ui-thumb i:nth-child(2) { height: 85%; }
-.ui-clean { background: #0c0a07; } .ui-clean i { background: #f5b931; } .ui-paper { background: #f3f1e8; border: 1px solid #d9d3bf; } .ui-paper i { background: #5a3208; } .ui-arcade { background: #12141f; } .ui-arcade i { background: #ff7a1a; border-radius: 0; }
+.ui-clean { background: #0c0a07; } .ui-clean i { background: #f5b931; } .ui-paper { background: #f3f1e8; border: 1px solid #d9d3bf; } .ui-paper i { background: #5a3208; } .ui-arcade { background: #12141f; } .ui-arcade i { background: #f5b931; border-radius: 0; }
 .cz-accents { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; } .cz-acc { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line2); background: var(--card2); color: var(--text); font: 600 .82rem var(--font); cursor: pointer; } .cz-acc i { width: 14px; height: 14px; border-radius: 50%; background: var(--c); } .cz-acc.sel { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
 .confetti { position: fixed; z-index: 9999; width: 8px; height: 12px; border-radius: 2px; pointer-events: none; animation: pop 1s cubic-bezier(.2, .7, .3, 1) forwards; }
 @keyframes pop { to { transform: translate(var(--dx), calc(var(--dy) + 120px)) rotate(var(--r)); opacity: 0; } }
@@ -403,10 +403,11 @@ ol.how { margin: 6px 0 12px; padding-left: 20px; display: grid; gap: 8px; } ol.h
 @media (max-width: 420px) { .cd-row { grid-template-columns: 20px 1fr; } .cd-row .small { grid-column: 2; } }
 
 /* ════════════════════════════════════════ The signature (from Mandarin 1.2): four marks every app the owner directs carries, in orange.
-   1 segment wheel: the logo is a car wheel (tread tyre, citrus rim, lug-nut hub) whose oil-gold segment lets fall a drop of oil; it turns while syncing. 2 corner fold on top-level cards.
+   Vehicular (26/11/2026) drops the citrus orange: the marks are oil-gold. 1 the logo: the slick tyre (tread blocks, an iridescent
+   oil-slick ring, five slim gold spokes, a gold cap with a V); it turns while syncing. 2 corner fold (gold underside). 2 corner fold on top-level cards.
    3 peel curl under every screen title. 4 pip: the seed that marks "now" (the active tab, now on the road, this month). */
 .topbar .brand .mark { width: 26px; height: 26px; flex-shrink: 0; overflow: visible; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
-.mark .tyre { fill: #1b1712; } .mark .tread { fill: none; stroke: #6a573d; stroke-width: 2.4; stroke-dasharray: 2.1 1.45; } .mark .rind { fill: var(--sig); } .mark .flesh { fill: var(--sig-pale); } .mark .seg { fill: var(--sig-app); } .mark .nut { fill: var(--sig-pale); } .mark .pith path { stroke: var(--sig); stroke-width: 1.4; stroke-linecap: round; fill: none; } .mark .core { fill: var(--sig-deep); }
+.mark .tyre { fill: #1b1712; } .mark .tread { fill: none; stroke: #6a573d; stroke-width: 2.4; stroke-dasharray: 2.1 1.45; } .mark .well { fill: #100c08; } .mark .slick { fill: none; stroke: url(#mk-slick); stroke-width: 2.6; } .mark .spoke { fill: url(#mk-gold); } .mark .cap { fill: url(#mk-gold); } .mark .rind { fill: var(--sig); } .mark .flesh { fill: var(--sig-pale); } .mark .seg { fill: var(--sig-app); } .mark .nut { fill: var(--sig-pale); } .mark .pith path { stroke: var(--sig); stroke-width: 1.4; stroke-linecap: round; fill: none; } .mark .core { fill: var(--sig-deep); }
 .topbar:has(.sync.busy) .brand .mark { animation: sig-spin 1.6s linear infinite; }
 @keyframes sig-spin { to { transform: rotate(360deg); } }
 :root[data-ui="arcade"] .topbar .brand .mark .flesh { fill: var(--sig); } :root[data-ui="arcade"] .topbar .brand .mark .pith path { stroke: #07080f; }
@@ -414,7 +415,7 @@ ol.how { margin: 6px 0 12px; padding-left: 20px; display: grid; gap: 8px; } ol.h
 .view > .card::after, .view .dash-grid > .card::after, .view .dash-grid > div > .card::after { content: ""; position: absolute; top: -1px; right: -1px; width: 16px; height: 16px; pointer-events: none; background: linear-gradient(225deg, var(--bg) 0 50%, var(--sig) 50% 100%); border-bottom-left-radius: 5px; border-top-right-radius: var(--r); box-shadow: -1px 1px 2px rgba(0, 0, 0, .25); }
 :root[data-ui="arcade"] .view .card::after { border-radius: 0; box-shadow: none; }
 .view h1:not(.sr-only) { display: inline-block; position: relative; padding-bottom: 12px; margin-bottom: 4px; }
-.view h1:not(.sr-only)::after { content: ""; position: absolute; left: 1px; bottom: 0; width: min(100%, 110px); height: 11px; background: no-repeat left center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 11'%3E%3Cpath d='M2 6.5C20 10 38 2.5 58 5.5S86 9.5 96 5C101 2.6 99 0.8 95.5 2.4C92.8 3.7 94 7.6 99 7.4C102.5 7.2 105 5.4 107.5 3.6' fill='none' stroke='%23ff7a1a' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.view h1:not(.sr-only)::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: clamp(7px, .24em, 12px); background: no-repeat 0 0 / 100% 100% url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23b8730a'/%3E%3Cstop offset='.5' stop-color='%23ffd36b'/%3E%3Cstop offset='1' stop-color='%23b8730a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 5C25 1.2 75 1.2 100 5C75 8.8 25 8.8 0 5Z' fill='url(%23g)'/%3E%3C/svg%3E"); }
 nav.tabs button.active::after { content: ""; position: absolute; bottom: 3px; left: 50%; width: 6px; height: 8px; margin-left: -3px; background: var(--sig); border-radius: 50% 50% 46% 46% / 62% 62% 38% 38%; transform: rotate(180deg); }
 @media (min-width: 900px) { nav.tabs button.active::after { bottom: auto; left: auto; right: 12px; top: 50%; margin: -4px 0 0; transform: rotate(90deg); } }
 svg .pip { fill: var(--sig); stroke: var(--card); stroke-width: 1.2; }

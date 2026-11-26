@@ -31,7 +31,7 @@ export function toolboxCard() {
   const on = CZ.allOn(S()), pre = EX.presetOf(on), n = Object.values(on).filter(Boolean).length;
   return h('div', { class: 'card wide', id: 'toolbox' },
     h('div', { class: 'card-h' }, h('div', { class: 'title' }, '🧰 Toolbox'), h('span', { class: 'tiny dim' }, `${n} of ${EX.TOOLS.length} on`)),
-    h('div', { class: 'small muted', style: { marginBottom: '10px' } }, 'Autolime stays simple until you want more. A tool only adds a card or a field where it belongs; what is due, your papers, fuel and the trip never move. Synced to your devices.'),
+    h('div', { class: 'small muted', style: { marginBottom: '10px' } }, 'Vehicular stays simple until you want more. A tool only adds a card or a field where it belongs; what is due, your papers, fuel and the trip never move. Synced to your devices.'),
     h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Toolbox preset', style: { marginBottom: '12px' } }, EX.PRESETS.map(([id, label, sub]) => h('button', { class: pre === id ? 'active' : '', role: 'radio', 'aria-checked': String(pre === id), title: sub, onClick: () => { const before = S(); ctx.update(s => CZ.setTools(s, EX.presetMap(id), true)); ctx.render(); undoToast(`Toolbox: ${label}`, before); } }, label))),
     h('div', { class: 'tool-groups' }, Object.keys(EX.TAB_NAME).map(tab => { const ts = EX.toolsFor(tab); return ts.length ? h('div', { class: 'tool-group' }, h('div', { class: 'tool-gh' }, EX.TAB_NAME[tab]), ts.map(t => toolRow(t, on[t.id], (v) => flip(t.id, v)))) : null; })));
 }

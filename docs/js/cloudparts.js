@@ -1,4 +1,4 @@
-// How Autolime's data is laid out on Drive (the family cloud model, claude/cloud-model.md, after Sudachi's cloudparts.js):
+// How Vehicular's data is laid out on Drive (the family cloud model, claude/cloud-model.md, after Sudachi's cloudparts.js):
 // one small core file (state.json: settings, tombstones, edit times, the migration mark) and every record — cars, workshops,
 // quotes, photo records — split over 8 part files (records-0.json … records-7.json) by a hash of "<collection>:<id>". Logging
 // a fill-up changes one car, so one part is uploaded instead of everything; a sync where another device changed one record

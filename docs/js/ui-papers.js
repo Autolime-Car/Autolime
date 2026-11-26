@@ -17,7 +17,7 @@ export function renderPapers() {
   const renew = PA.openRenewals(s, c, now);
   return [viewHead('Papers', h('button', { class: 'btn sos', onClick: () => accidentSheet(c) }, '🚨 Accident card')), carChips(s),
     papersCard(c, now), ...renew.map((r, i) => renewCard(c, r, i === 0)), insCard(c, now), driverCard(now), walletCard(c, s), ...EXU.tabTools('papers', c), idCard(c, CC.MODELS[c.model]),
-    h('div', { class: 'tiny dim', style: { margin: '4px 2px 14px' } }, 'Autolime only reminds. The istimara and the licence renew in Absher, the fahas at an inspection centre (book first), the insurance with your insurer.'), EXU.toolsHint('papers')];
+    h('div', { class: 'tiny dim', style: { margin: '4px 2px 14px' } }, 'Vehicular only reminds. The istimara and the licence renew in Absher, the fahas at an inspection centre (book first), the insurance with your insurer.'), EXU.toolsHint('papers')];
 }
 function papersCard(c, now) {
   const dr = L.driverOf(S()), next = PA.fahasBookBy(c);
@@ -51,7 +51,7 @@ function insCard(c, now) {
 }
 function driverCard(now) {
   const d = L.driverOf(S()), days = L.daysUntil(d.licence, now), held = L.heldFor(d.issued, now);
-  return h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('span', { class: 'ic' }, '🪪'), h('div', { class: 'grow' }, h('div', { class: 'title', style: { margin: 0 } }, 'You, the driver'), h('div', { class: 'tiny dim' }, d.licence ? `${d.type || 'Driving'} licence until ${dmy(d.licence)}` : 'Add your licence expiry: Autolime reminds you two months before.')),
+  return h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('span', { class: 'ic' }, '🪪'), h('div', { class: 'grow' }, h('div', { class: 'title', style: { margin: 0 } }, 'You, the driver'), h('div', { class: 'tiny dim' }, d.licence ? `${d.type || 'Driving'} licence until ${dmy(d.licence)}` : 'Add your licence expiry: Vehicular reminds you two months before.')),
       d.licence ? tag(days < 0 ? 'late' : days <= L.LICENCE_WARN ? 'soon' : 'ok', days < 0 ? 'Expired' : days > 365 ? `${Math.floor(days / 365)} y ${Math.floor(days % 365 / 30)} m` : `${days} d`) : null, h('button', { class: 'btn sm ghost', onClick: driverSheet }, d.licence ? 'Edit' : 'Add')),
     held || d.blood ? h('div', { class: 'stats' }, held ? stat(`${held.years}`, `years driving (since ${dmy(d.issued)})`) : null, d.blood ? stat(d.blood, 'blood type (accident card)') : null) : null);
 }

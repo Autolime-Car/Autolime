@@ -1,7 +1,7 @@
-// Who works when, read from Mandarin (My Apps/hub/mandarin/shifts.json). Autolime never parses rota files: Mandarin owns them.
+// Who works when, read from Mandarin (My Apps/hub/mandarin/shifts.json). Vehicular never parses rota files: Mandarin owns them.
 // shifts.json holds your own days (corrections included) from a week back to six weeks ahead, the roster by rota key
 // (`id:<staff id>` or `name:<lower-case name>`) with a legend code or only the kind of day, and the GP legend with hours.
-// This module keeps the last copy on this device (so Autolime works offline) and answers "what is X doing on day D?".
+// This module keeps the last copy on this device (so Vehicular works offline) and answers "what is X doing on day D?".
 import { keyOf } from './util.js';
 
 const KEY = 'autolime.shifts';

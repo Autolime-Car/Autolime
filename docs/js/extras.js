@@ -1,4 +1,4 @@
-// The toolbox: Autolime stays simple until you switch a tool on. Each tool lives on one tab, shows nothing while it is off,
+// The toolbox: Vehicular stays simple until you switch a tool on. Each tool lives on one tab, shows nothing while it is off,
 // and never moves the main things (what is due, the papers, the fuel, the trip). Pure (no DOM): the registry, the data the
 // tools keep on a car (car.x), and what they work out. Settings › Toolbox and the "Tools for this tab" link switch them.
 import { keyOf, fromKey, startOfDay, uid } from './util.js';

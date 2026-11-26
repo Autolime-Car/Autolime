@@ -96,7 +96,7 @@ export function fuelSheet(c) {
   const stn = stOn ? h('input', { maxlength: 40, list: dl, placeholder: 'station (optional)', value: (c.fuel || []).filter(f => f.station).slice(-1)[0]?.station || '', 'aria-label': 'Station' }) : null;
   const full = h('input', { type: 'checkbox', checked: true }), trip = c.trip && !c.trip.closed && c.trip.date && c.trip.date <= keyOf(now) && (!c.trip.end || c.trip.end >= keyOf(now)) ? h('input', { type: 'checkbox', checked: true }) : null, err = h('div', { class: 'err', role: 'alert' });
   const box = sheet([h('h2', {}, '⛽ Fill-up'), h('div', { class: 'grid2' }, field('Litres', l), field('Paid (SAR)', sr)), per, h('div', { class: 'grid2', style: { marginTop: '8px' } }, field('Odometer (km)', k), field('Date', d)), stn ? field('Station', stn, h('datalist', { id: dl }, known.map(n => h('option', { value: n })))) : null, h('label', { class: 'row small' }, full, ' Filled to full (needed for L/100 km)'), trip ? h('label', { class: 'row small' }, trip, ` Count it in the trip “${c.trip.name || 'road trip'}”`) : null, err,
-    h('div', { class: 'tiny dim' }, 'Fill to full twice with the odometer and Autolime works out your consumption and cost per km.'),
+    h('div', { class: 'tiny dim' }, 'Fill to full twice with the odometer and Vehicular works out your consumption and cost per km.'),
     foot(h('button', { class: 'btn primary grow', onClick: () => { if (!(+l.value > 0)) { err.textContent = 'How many litres?'; return; } const before = S(); let car = CC.addFuel(c, { date: d.value, litres: l.value, cost: sr.value || (lastPrice ? Math.round(+l.value * lastPrice.cost / lastPrice.litres * 100) / 100 : 0), km: k.value, full: full.checked, station: stn?.value || '' });
       if (trip?.checked) car = { ...car, trip: { ...car.trip, log: [...(car.trip.log || []), { date: d.value, kind: 'fuel', sar: +sr.value || 0, litres: +l.value, note: '', at: Date.now() }] } };
       putCar(car); box.close(); ctx.render(); undoToast('Fill-up saved', before); } }, 'Save'), cancel(() => box))]);
@@ -182,7 +182,7 @@ export function accidentSheet(c) {
     h('div', { class: 'calls' }, PO.CALLS.slice(0, 4).map(([l, n, ic]) => h('a', { class: `btn ${n === '199033' ? 'sos' : ''}`, href: n === '920000560' ? 'https://wa.me/966920000560' : tel(n), target: n === '920000560' ? '_blank' : null, rel: 'noopener' }, `${ic} ${l.replace(/ \(.*\)/, '')}`, h('br'), h('b', { class: 'n' }, n))),
       i?.phone ? h('a', { class: 'btn', href: tel(i.phone), style: { gridColumn: '1 / -1' } }, `🛡️ ${i.company || 'Insurer'} · ${i.phone}`) : null),
     h('button', { class: 'btn primary', style: { width: '100%', minHeight: '56px', fontSize: '1.05rem' }, onClick: async () => { const p = await ctx.takePhoto({ kind: 'accident', car: c?.id || '', note: 'Accident' }); if (p) { box.close(); accidentSheet(c); } } }, `📷 Take photos${shots.length ? ` (${shots.length} today)` : ''}`),
-    h('div', { class: 'tiny dim', style: { margin: '4px 0 10px' } }, 'Saved on this phone at once, then to your Drive (Car - Autolime › photos › accident). Both cars from all sides, the plates, the damage, the road.'),
+    h('div', { class: 'tiny dim', style: { margin: '4px 0 10px' } }, 'Saved on this phone at once, then to your Drive (Car - Vehicular › photos › accident). Both cars from all sides, the plates, the damage, the road.'),
     shots.length ? h('div', { class: 'wallet', style: { marginBottom: '10px' } }, shots.map(p => thumb(p))) : null,
     c ? h('div', { class: 'card', style: { boxShadow: 'none' } }, h('div', { class: 'tiny dim', style: { marginBottom: '6px' } }, 'Read these out when asked'), h('div', { class: 'read-out' },
       ...[c.plate ? ['Plate', `${c.plate}${pp ? ` (${pp.digits} ${pp.lat.join(' ')})` : ''}`] : null, c.vin ? ['VIN', c.vin] : null, i?.company ? ['Insurer', i.company] : null, i?.policy ? ['Policy', i.policy] : null, i?.kind ? ['Cover', L.INS_KIND[i.kind]] : null, dr.blood ? ['Your blood type', dr.blood] : null, dr.ice ? ['Emergency contact', dr.ice] : null]
@@ -248,7 +248,7 @@ export function setupSheet(o, { onAdded } = {}) {
   const lines = [car.name && `🚗 ${car.name}${car.year ? ` ${car.year}` : ''}${car.colour ? `, ${colourName(car.colour).toLowerCase()}` : ''}`, car.plate && `🔢 Plate ${car.plate}${car.plateLatin ? ` (${car.plateLatin})` : ''}`, car.vin && `🧬 VIN ${car.vin}`,
     car.istimara && `📄 Istimara until ${dmy(car.istimara)}`, car.fahas && `🔧 Fahas until ${dmy(car.fahas)}`, car.insurance && `🛡️ ${car.ins?.company || 'Insurance'} until ${dmy(car.insurance)}${car.ins?.kind ? ` · ${L.INS_KIND[car.ins.kind]}` : ''}`,
     dr?.licence && `🪪 Licence until ${dmy(dr.licence)}`, car.tyre && `🛞 ${car.tyre.brand || 'Tyres'} ${car.tyre.size || ''}${car.tyre.fitted ? `, fitted ${dmy(car.tyre.fitted)}` : ''}`, car.plan && `🗓 Planned service${car.plan.date ? ` ${dmy(car.plan.date)}` : ''}: ${car.plan.items?.length || 0} items`, car.trip && `🛣️ ${car.trip.name || 'Road trip'}${car.trip.date ? ` from ${dmy(car.trip.date)}` : ''}`].filter(Boolean);
-  const box = sheet([h('h2', {}, car.name ? (existing ? `Update ${existing.name}?` : 'Add your car?') : 'Add this to Autolime?'), h('ul', { class: 'small' }, lines.map(l => h('li', {}, l))),
+  const box = sheet([h('h2', {}, car.name ? (existing ? `Update ${existing.name}?` : 'Add your car?') : 'Add this to Vehicular?'), h('ul', { class: 'small' }, lines.map(l => h('li', {}, l))),
     h('div', { class: 'tiny dim' }, existing ? 'Your care plan, readings and history stay as they are.' : 'Then say when the oil and the rest were last done to start the countdowns.'),
     foot(h('button', { class: 'btn primary grow', onClick: () => {
       const before = S();
@@ -267,7 +267,7 @@ export function photoSheet(p) {
   const img = h('img', { class: 'photo-big', alt: `${PH.kindOf(p.kind)[1]} photo` }); ctx.photoUrl(p).then(u => { if (u) img.src = u; else img.alt = 'Not on this device yet — it is on the phone that took it until that one syncs'; }).catch(e => { img.alt = e.message; });
   const note = h('input', { value: p.note || '', maxlength: 140, placeholder: 'Note' });
   const box = sheet([h('h2', {}, `${PH.kindOf(p.kind)[2]} ${PH.kindOf(p.kind)[1]} · ${dmy(p.date)}`), img, field('Note', note),
-    h('div', { class: 'tiny dim' }, p.file ? 'Kept in your Drive: Car - Autolime › photos.' : 'Kept on this phone; it goes to your Drive on the next sync.'),
+    h('div', { class: 'tiny dim' }, p.file ? 'Kept in your Drive: Car - Vehicular › photos.' : 'Kept on this phone; it goes to your Drive on the next sync.'),
     foot(h('button', { class: 'btn primary grow', onClick: () => { ctx.update(st => PH.savePhoto(st, { ...p, note: note.value })); box.close(); ctx.render(); } }, 'Save'), h('button', { class: 'btn danger', onClick: () => { const before = S(); ctx.update(st => PH.deletePhoto(st, p.id)); ctx.binPhoto(p); box.close(); ctx.render(); undoToast('Photo removed', before); } }, 'Remove'), cancel(() => box, 'Close'))], 'wide');
 }
 export { careRow };

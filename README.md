@@ -1,4 +1,4 @@
-# Autolime
+# Vehicular (was Autolime)
 
 Your car, looked after. The car app of the citrus family: a PWA with no build step, served from `docs/`.
 

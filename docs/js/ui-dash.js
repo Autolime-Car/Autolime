@@ -34,7 +34,7 @@ export function renderDash() {
   ];
 }
 function welcome() {
-  return [h('h1', {}, 'Autolime'),
+  return [h('h1', {}, 'Vehicular'),
     h('div', { class: 'cluster' }, h('div', { class: 'cl-name' }, 'Your car, looked after'), h('div', { class: 'cl-sub', style: { margin: '6px 0 12px', maxWidth: '520px' } }, 'Oil, brakes, tyres, suspension and the rest — each due by km or by date, with the Arabic words for the workshop. The papers and renewals, fuel and money, road trips and the accident card.'),
       h('div', { class: 'row wrap' }, h('button', { class: 'btn primary', onClick: () => carSheet(null, CC.fromModel('camry-2016')) }, '🚗 Toyota Camry 2016'), h('button', { class: 'btn', onClick: () => carSheet(null, CC.fromModel('generic')) }, 'Another car'), h('button', { class: 'btn', onClick: () => insSheet(null) }, '📄 From my insurance PDF'))),
     h('div', { class: 'card' }, h('div', { class: 'title' }, 'Already set up in Calamansi?'), h('div', { class: 'small muted' }, 'Your car, its service history, fuel log and licence come over in one tap once you sign in to Google (Settings). Nothing is deleted in Calamansi.'),
