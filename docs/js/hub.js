@@ -43,7 +43,7 @@ export function buildStatus(s, now = new Date()) {
     { id: 'fuel', label: 'Log fuel', url: `${base}?do=fuel`, icon: '⛽', minutes: 1 },
     { id: 'accident', label: 'Accident card', url: `${base}?do=accident`, icon: '🚨' },
   ];
-  const head = { app: 'autolime', title: 'Autolime', icon: '🚗', color: '#b6f23a', url: base, contract: CONTRACT, updatedAt: now.toISOString(), drive: { byTag: true } };
+  const head = { app: 'autolime', title: 'Autolime', icon: '🚗', color: '#f5b931', url: base, contract: CONTRACT, updatedAt: now.toISOString(), drive: { byTag: true } };
   if (!car) return { ...head, summary: 'No car yet', today: { date: t, done: true }, next: null, asks: [], metrics: [], pending: [], inbox: [], actions, extra: {} };
 
   const items = car.model ? CC.plan(car, now) : [], hp = CC.health(items), urgent = items.filter(x => x.state === 'late' || x.state === 'soon');

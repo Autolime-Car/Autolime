@@ -1,12 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#0d0f0e"/>
-  <path d="M96 368A184 184 0 1 1 416 368" fill="none" stroke="#1f2622" stroke-width="22" stroke-linecap="round"/>
-  <path d="M96 368A184 184 0 0 1 340 96" fill="none" stroke="#b6f23a" stroke-width="22" stroke-linecap="round"/>
-  <g transform="translate(256 262)">
-    <circle r="150" fill="#ff7a1a"/>
-    <circle r="120" fill="#ffd9b8"/>
-    <path d="M0 0L103.9 60A120 120 0 0 1 0 120Z" fill="#b6f23a"/>
-    <g stroke="#ff7a1a" stroke-width="14" stroke-linecap="round" fill="none"><path d="M0 0V-120M0 0L103.9 -60M0 0L103.9 60M0 0V120M0 0L-103.9 60M0 0L-103.9 -60"/></g>
-    <circle r="18" fill="#e0600a"/>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%"><stop offset="0" stop-color="#2a1d0c"/><stop offset=".55" stop-color="#140f08"/><stop offset="1" stop-color="#0a0805"/></radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a4bd6" stop-opacity=".0"/><stop offset=".45" stop-color="#3f8fc9" stop-opacity=".10"/><stop offset=".6" stop-color="#7b5be0" stop-opacity=".12"/><stop offset="1" stop-color="#e8a33d" stop-opacity="0"/></linearGradient>
+    <radialGradient id="oil" cx="60%" cy="70%" r="70%"><stop offset="0" stop-color="#ffd36b"/><stop offset=".5" stop-color="#f5b931"/><stop offset="1" stop-color="#b8730a"/></radialGradient>
+    <linearGradient id="drop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5b931"/><stop offset="1" stop-color="#9c5a06"/></linearGradient>
+    <radialGradient id="tyre" cx="50%" cy="45%" r="55%"><stop offset=".72" stop-color="#1b1712"/><stop offset=".9" stop-color="#2a241b"/><stop offset="1" stop-color="#14110d"/></radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#sheen)"/>
+  <g transform="translate(240 236)">
+    <!-- tyre with tread -->
+    <circle r="196" fill="url(#tyre)"/>
+    <circle r="196" fill="none" stroke="#4a3d2b" stroke-width="24" stroke-dasharray="22 11.3"/>
+    <circle r="170" fill="none" stroke="#0e0b08" stroke-width="4"/>
+    <!-- the rim = the citrus wheel: orange rind lip, pale flesh, six pith spokes, one segment of oil -->
+    <circle r="152" fill="#ff7a1a"/>
+    <circle r="152" fill="none" stroke="#ffb36b" stroke-width="3" opacity=".7"/>
+    <circle r="128" fill="#ffd9b8"/>
+    <path d="M0 0L110.9 64A128 128 0 0 1 0 128Z" fill="url(#oil)"/>
+    <path d="M14 108A110 110 0 0 0 86 72" fill="none" stroke="#fff1c9" stroke-width="7" stroke-linecap="round" opacity=".75"/>
+    <g stroke="#ff7a1a" stroke-width="16" stroke-linecap="round" fill="none"><path d="M0 0V-128M0 0L110.9 -64M0 0L110.9 64M0 0V128M0 0L-110.9 64M0 0L-110.9 -64"/></g>
+    <!-- hub and lug nuts -->
+    <circle r="36" fill="#e0600a"/>
+    <circle r="36" fill="none" stroke="#ff9a4a" stroke-width="3"/>
+    <g fill="#ffd9b8"><circle cx="0" cy="-20" r="5.5"/><circle cx="19" cy="-6.2" r="5.5"/><circle cx="11.8" cy="16.2" r="5.5"/><circle cx="-11.8" cy="16.2" r="5.5"/><circle cx="-19" cy="-6.2" r="5.5"/></g>
+    <circle r="7" fill="#9c3f00"/>
   </g>
+  <!-- the oil drop the wheel's segment lets fall: the gesture -->
+  <ellipse cx="398" cy="474" rx="58" ry="9" fill="#f5b931" opacity=".18"/>
+  <path d="M398 392C398 392 370 426 370 444A28 28 0 0 0 426 444C426 426 398 392 398 392Z" fill="url(#drop)"/>
+  <path d="M384 440A14 14 0 0 0 391 456" fill="none" stroke="#ffe3a0" stroke-width="6" stroke-linecap="round" opacity=".85"/>
 </svg>

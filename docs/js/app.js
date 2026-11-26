@@ -29,7 +29,7 @@ import { renderGarage, garagePart, quoteSheet, partSheet } from './ui-garage.js'
 import { checkBackup, describeCounts } from './backup-check.js';
 import { h, toast, keyOf, addDays, startOfDay, fromKey, fmtDate, DAY_NAMES, MONTHS, uid } from './util.js';
 
-export const VERSION = '1.3.0';
+export const VERSION = '1.4.0';
 const CITRUS_URL = 'https://amaerys.github.io/citrus-maxima/';
 const CALAMANSI_URL = 'https://calamansi-food.github.io/Calamansi/';
 
@@ -103,7 +103,7 @@ function applyLook() { const l = CZ.custom(S()).look, r = document.documentEleme
 function cheer(from) {
   if (!CZ.custom(S()).look.fun || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const r = (from?.getBoundingClientRect?.() || { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 }), x = r.left + r.width / 2, y = r.top + r.height / 2;
-  const colors = ['#b6f23a', '#ff7a1a', '#ffb020', '#3ad6f2', '#eef3ec'];
+  const colors = ['#f5b931', '#ff7a1a', '#ffd36b', '#3ad6f2', '#f4eee3'];
   for (let i = 0; i < 18; i++) { const p = document.createElement('i'), a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 90; p.className = 'confetti'; p.style.cssText = `left:${x}px;top:${y}px;background:${colors[i % colors.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 40}px;--r:${Math.random() * 540 - 270}deg;`; document.body.append(p); setTimeout(() => p.remove(), 1000); }
 }
 function undoTo(before) { store.replaceState(before, { bump: true, exact: S() }); render(); toast('Undone'); }
@@ -185,7 +185,7 @@ function crashCard(e) {
 const UI_KEY = 'autolime.ui';
 function getUi() { let u = {}; try { u = JSON.parse(localStorage.getItem(UI_KEY) || '{}') || {}; } catch {} if (!u.ui) u.ui = 'clean'; if (!u.size) u.size = 'normal'; return u; }
 function setUi(patch) { const u = { ...getUi(), ...patch }; try { localStorage.setItem(UI_KEY, JSON.stringify(u)); } catch {} applyTheme(); render(); }
-function applyTheme() { const u = getUi(), r = document.documentElement; r.dataset.ui = u.ui; r.dataset.size = u.size; r.dataset.theme = u.ui === 'paper' ? 'light' : 'dark'; const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = u.ui === 'paper' ? '#f3f1e8' : u.ui === 'arcade' ? '#12141f' : '#0d0f0e'; }
+function applyTheme() { const u = getUi(), r = document.documentElement; r.dataset.ui = u.ui; r.dataset.size = u.size; r.dataset.theme = u.ui === 'paper' ? 'light' : 'dark'; const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = u.ui === 'paper' ? '#f3f1e8' : u.ui === 'arcade' ? '#12141f' : '#0c0a07'; }
 
 // ---------------- sync ----------------
 function renderSync() {
